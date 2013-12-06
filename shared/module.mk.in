@@ -1,0 +1,6 @@
+DIR := shared/
+
+LIBSRC += \
+	$(DIR)/check_capfs.c $(DIR)/dfd_set.c $(DIR)/iod_comm.c $(DIR)/llist.c \
+	$(DIR)/log.c $(DIR)/resv_name.c $(DIR)/rpcutils.c $(DIR)/sha.c \
+	$(DIR)/sockio.c $(DIR)/sockset.c $(DIR)/unix-stats.c

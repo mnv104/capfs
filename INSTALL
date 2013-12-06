@@ -1,0 +1,109 @@
+Compilation of this software can be done by following the steps outlined below.
+
+The first step is to run configure to generate the Makefile that orchestrate the entire
+build.
+
+
+a) ./configure --help outlines the help options to run this script.
+ An example run could be like this
+ ./configure --with-debug --with-plugins=/path/to/capfs/client/ --with-mpi=/path/to/mpich
+
+ Note that --with-plugins requires the absolute path to the client subdirectory in the source
+ tree as of now. SO it is a required options. Locations to the kernel source/MPI source
+ is completely optional and need not be specified at configure time. They are needed
+ only if the vfs kernel module needs to be built as well as the test programs.
+
+ Any error messages at configure time should be hopefully self-explanatory as to why
+ things did not work out. If not please send an email to me (vilayannATcse.psu.edu)
+
+b) The next step after configure is to simply type make and hope that everything works.
+ As I said, things may or may not work on your particular platform. But I think it should
+ atleast compile :). If not, you know whom to send an email :)
+
+c) The above step only compiles the userland tools/daemons etc. To compile the VFS glue
+ you can type make kmod that should build the vfs glue against the running 2.4 based
+ kernel or against a specified kernel source tree (specified with the --with-kernel option
+ at configure time)
+
+d) make -C test/ should compile the test programs in the test subdirectory.
+
+
+okay, whew if you have reached here that is indeed good news (assuming you have not jumped here
+directly :))
+
+To get things started, first setup a directory (say /opt/capfs-meta) on some machine (mach1).
+Run the utils/mkmgrconf script and provide it the necessary parameters. Let's assume that
+mach2, mach3,...machN are the N-1 CAS servers that make up the CAPFS file system. 
+For each of the I/O servers generate an iod.conf file whose template looks like so
+
+# IOD Configuration file, iod.conf
+              port 7001
+              user nobody
+              group nobody
+              rootdir /
+              datadir /opt/capfs-data
+              logdir /tmp
+              debug 0
+Most of the fields are self-explanatory. The datadir (/opt/capfs-data in this case)
+represents the tree hierarchy under which the CAS servers store the filesystem data.
+Port Number refers to the port number to which the CAS servers will bind their RPC
+interfaces.
+
+a) Start the meta-data server on mach1 like so
+/path/to/capfs/meta-server/mgr_prot_server
+
+b) Start the CAS servers on mach2,mach3...machN like so
+/path/to/capfs/data-server/iod_prot_server /path/to/iod.conf
+
+Both these servers can be run in the foreground with the -d switch to them at command line prompt.
+
+c) If you wish to test out whether the file system is alive, try
+/path/to/capfs/utils/capfs-ping -h mach1 -f /opt/capfs-meta
+and you should see if things have been installed and running correctly or now.
+Hopefully, things should be up and running. Please be sure to allow RPC packets
+in case you are running a firewall. Check the iptables documentation for allowing specific
+ports.
+
+d) Okay, in order to the use the vfs glue, you must have compiled the vfs code against
+the running kernel or a specified kernel. Now load the module like so
+insmod /path/to/capfs/vfs/capfs.o
+
+e) now you should be able to mount the capfs filesystem like
+/path/to/capfs/client/mount.capfs mach1:/opt/capfs-meta /mnt/capfs.
+Voila, you should be able to access the capfs volume under /mnt/capfs.
+
+The mount binary recognizes a few other options, that are not completely functional
+in this release. But look out for the following options in the near future releases.
+ i) cons=<posix|imm|session|trans> will dictate on the fly mount time consistency semantics.
+Watch this space for more announcements and newer features.
+
+Enjoy! Please contact me (vilayann@cse.psu.edu) if you have any questions/concerns.
+I will be glad to help, if I can.
+
+Murali
+ &
+CAPFS team at Penn State.
+
+
+
+CAVEATS AND FAQs
+
+a) If the capfs-ping utility reports that the file-system does not work, 
+then try to do 
+
+% rpcinfo -p <hostname>
+
+If the output shows up <No remote programs registered>
+
+then it means that the portmapper does not PERMIT/ALLOW for the client to dump its
+portmapping tables. The way to fix this problem is by editing /etc/hosts.allow
+on the remote host to allow the portmapper from the respective clients.
+
+b) A single read/write call cannot be larger than the product of
+CAPFS_MAXHASHES * CAPFS_CHUNKSIZE which by default is 256 MB. 
+This seems reasonable. In case this is a problem, PLEASE edit lib/capfs_config.h
+the value of CAPFS_MAXHASHES!! DO NOT change the value of CAPFS_CHUNKSIZE unless
+you wish to reformat the file-system or LOSE your data!
+
+
+

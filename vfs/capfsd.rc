@@ -1,0 +1,47 @@
+#!/bin/sh
+#
+# 2003.05.28 Brian Elliott Finley
+#   - made more distro independent
+#
+### BEGIN INIT INFO
+# Provides:            capfsd
+# Default-Start:       3 5 
+# Default-Stop:        0 1 2 6
+# Description:         CAPFS virtual file system daemon
+### END INIT INFO
+
+
+DAEMON=capfsd
+OPTS=
+
+PREFIX=/usr/local/sbin
+PATH=${PREFIX}:/sbin:/usr/sbin:/bin:/usr/bin
+
+[ -f ${PREFIX}/${DAEMON} ] || exit 0
+
+# See how we were called.
+case "$1" in
+  start)
+	echo -n "Starting CAPFS VFS daemon: "
+	modprobe capfs
+	[ ! -f /var/lock/subsys/${DAEMON} ] && ${DAEMON} ${OPTS}
+	echo ${DAEMON}.
+	touch /var/lock/subsys/${DAEMON}
+	;;
+  stop)
+	echo -n "Stopping CAPFS VFS daemon: "
+	[ -f /var/lock/subsys/${DAEMON} ] && killall ${DAEMON}
+	echo ${DAEMON}.
+	rm -f /var/lock/subsys/${DAEMON}
+	;;
+  restart)
+	$0 stop
+	$0 start
+	;;
+  *)
+	echo "Usage: $0 {start|stop|restart}"
+	exit 1
+esac
+
+exit 0
+

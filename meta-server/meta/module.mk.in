@@ -1,0 +1,7 @@
+DIR := meta-server/meta/
+
+LIBSRC += \
+	$(DIR)/md_chmod.c $(DIR)/md_chown.c $(DIR)/md_open.c $(DIR)/md_stat.c $(DIR)/md_close.c $(DIR)/md_unlink.c \
+	$(DIR)/put_dmeta.c $(DIR)/md_rmdir.c $(DIR)/metaio.c $(DIR)/dmetaio.c $(DIR)/get_dmeta.c \
+	$(DIR)/md_mkdir.c $(DIR)/md_link.c
+

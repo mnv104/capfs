@@ -1,0 +1,5 @@
+DIR := test/
+
+TESTSRC += \
+			$(DIR)/hash_stress_test.c $(DIR)/test_dcache.c $(DIR)/test_hcache.c $(DIR)/test-rpcutils.c $(DIR)/test_sha1.c
+

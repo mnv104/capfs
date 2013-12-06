@@ -1,0 +1,16 @@
+This file documents known bugs in the given release.
+
+Version 1.5.7-pre1
+-------------
+
+- mmap may not be consistent across multiple client nodes
+
+- "cp -pr" does not preserve creation time for directories (tar
+  may not either).  We need the capfs mgr to handle utime requests
+  for files correctly to do this right.
+
+- The kernel "highmem" option is incompatible with our "mapped" transfer
+  mechanism.  Please do not use the mapped transfer mechanisms on
+  systems that use this option and actually have > 2G of memory.
+
+- O_EXCL is not reliable across seperate clients.

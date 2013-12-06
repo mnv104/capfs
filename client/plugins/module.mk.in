@@ -1,0 +1,5 @@
+DIR := client/plugins/
+
+PLUGINSRC += \
+			$(DIR)/posix.c $(DIR)/session.c $(DIR)/imm.c $(DIR)/trans.c $(DIR)/force.c $(DIR)/pvfs.c $(DIR)/oposix.c $(DIR)/oforce.c $(DIR)/opvfs.c
+

@@ -1,0 +1,408 @@
+# Top level makefile for capfs
+
+###############################################################
+# LIST OF TARGETS WHICH MAY BE USED WHEN RUNNING MAKE:
+#
+# all            default rule; builds libs, server, and test programs
+# clean          cleans up files
+# distclean      _really_ cleans up; returns to pristine tree
+# cscope         generates information for cscope utility
+# tags           generates tags file for use by editors
+# kmod           builds 2.4.x kernel module
+# NOTE: you can also specify any single object or executable to
+#    build by providing its name (including the relative path) as the
+#    make target
+#
+
+###############################################################
+# General documentation
+#
+# This is a single makefile that runs the entire capfs build
+# process.  There are no makefiles in subdirectories.  For a
+# general introduction to this approach, please read this document
+# by Peter Miller:
+#
+# http://www.tip.net.au/~millerp/rmch/recu-make-cons-harm.html
+#
+# Each subdirectory contains a module.mk file that gets included
+# when make is executed.  These module.mk files tell make about the
+# files in each subdirectory that must be built, including any
+# special case rules.  Make uses this information to generate a
+# sinle dependency graph and orchestrate the build process from this
+# top level directory.
+#
+
+###############################################################
+# Generic makefile setup 
+
+# define a few generic variables that we need to use
+srcdir = @srcdir@
+prefix = @prefix@
+mandir = @mandir@
+exec_prefix = @exec_prefix@
+
+VPATH = $(srcdir)
+SHELL = @SHELL@
+INSTALL = @INSTALL@
+
+GNUC = @GNUC@
+INTELC = @INTELC@
+
+# configure default is silent, unless --enable-verbose-build in
+# which case QUIET_COMPILE will _not_ be defined.  Further allow
+# silence to be overriden with "make V=1".
+QUIET_COMPILE = @QUIET_COMPILE@
+ifdef V
+    QUIET_COMPILE = 0
+endif
+
+ifeq ($(QUIET_COMPILE),1)
+  # say a one-line description of the action, do not echo the command
+  Q=@echo
+  E=@
+else
+  # do not say the short Q lines, but do echo the entire command
+  Q=@echo >/dev/null
+  E=
+endif
+
+# Eliminate all default suffixes.  We want explicit control.
+.SUFFIXES:
+
+# PHONEY targets are targets that do not result in the generation
+#    of a file that has the same name as the target.  Listing them
+#    here keeps make from accidentally doing too much work (see GNU
+#    make manual).
+.PHONY: all clean cleaner distclean cscope tags
+
+################################################################
+# Find project subdirectories
+
+# MODULES is a list of subdirectories that we wish to operate on.
+#    They are identified by the presence of module.mk files (makefile
+#    includes).
+
+MODULES := $(shell find . -name "*.mk" | sed -e 's/^.\///;s/module.mk//')
+
+# List of directories to search for headers.
+INCLUDES := \
+	shared/ \
+	cmgr/ \
+	tpool/include/ \
+	client/ \
+	meta-server/ \
+	data-server/ \
+	libcas/ \
+	vfs/ \
+	lib/
+	
+#################################################################
+# Setup global flags
+
+# These should all be self explanatory; they are standard flags
+# for compiling and linking unless otherwise noted
+CC = @CC@
+LD = @CC@
+BUILD_CC = @BUILD_CC@
+BUILD_LD = @BUILD_CC@
+CFLAGS = @CFLAGS@
+LDFLAGS = @LDFLAGS@
+LDSHARED = $(CC) -shared
+PICFLAGS = -fPIC
+SSLLIBS = @SSLLIBS@
+RPCGEN = rpcgen
+RPCGENFLAGS = -N -C -M
+LDFLAGS += -L libs 
+LIBS += -lcapfs @LIBS@
+LIBS += $(SSLLIBS) -lnsl -lpthread 
+
+ARCH_CFLAGS = @CAPFS_ARCH_CFLAGS@
+# turn on large file support by default
+CFLAGS += -D_FILE_OFFSET_BITS=64 -D_LARGEFILE64_SOURCE 
+#include current directory for capfs-header.h
+CFLAGS += -I.
+CFLAGS += -I include -I $(srcdir)
+# add selected include directories as well
+CFLAGS += $(patsubst %,-I$(srcdir)/%,$(INCLUDES))
+  # add package version information
+CFLAGS += -DCAPFS_VERSION="\"@CAPFS_VERSION@\""
+  # special Intel cc options, all warnings, but disable:
+  # remark #279: controlling expression is constant
+  #   shows up in ifdefs such as "do { ... } while (0)" construct
+INTEL_CFLAGS := -Wall -wd279 -O
+  # special gcc options
+GCC_CFLAGS := -Wall -Wstrict-prototypes -pipe -O2
+# add flags for indicating that we are on Linux, reentrancy and any other special flags
+CFLAGS += -D_REENTRANT -DLINUX -D_GNU_SOURCE -DCAPFS
+# flag for debug print statements
+#CFLAGS += -DDEBUG
+# flag for debug symbols
+CFLAGS += -g
+# flag for generating dependancies 
+CFLAGS += -MMD
+
+# Add gcc-specific flags if we know it is a gnu compiler.
+ifdef GNUC
+CFLAGS += $(GCC_CFLAGS) 
+endif
+ifdef INTELC
+CFLAGS += $(INTEL_CFLAGS)
+endif
+
+#################################################################
+# Starter variables 
+
+# NOTES: These variables are used to categorize the various source
+#    files.  We let the makefile includes append to them so that we
+#    gradually build up a list of source files without having to
+#    list them all at the top level.
+
+# LIBSRC is the source code for libcapfs
+LIBSRC :=
+# CAPFSDSRC is the source code for the client-side capfsd daemon
+CAPFSDSRC :=
+# MGRSRC is the source code for the mgr daemon
+MGRSRC :=
+# IODSRC is the source code for the iod daemon
+IODSRC :=
+# KERNAPPSRC is the source code for the kernel apps
+KERNAPPSRC := 
+# UTILSSRC is the source code for utils
+UTILSSRC :=
+# PLUGINSRC is the source code for plugins
+PLUGINSRC :=
+
+################################################################
+# Top level (default) targets
+
+# There are 2 server-side daemons
+SERVER := meta-server/mgr_prot_server data-server/iod_prot_server 
+# There is one client-side daemon
+CLIENT := client/capfsd
+# Libraries is the list of the capfs libraries that can be linked by both clients and servers
+LIBRARIES := libs/libcapfs.a 
+
+################################################################
+# Default target forward pointer, to avoid other targets in make stubs
+all::
+
+################################################################
+# Makefile includes
+
+# this is how we pull build information from all of the project
+#    subdirectories, make sure to catch top level module.mk as well
+include module.mk
+include $(patsubst %, %/module.mk, $(MODULES))
+
+################################################################
+# Derived file lists
+# NOTES: At this point, the subdirectory makefile includes have informed
+#    us what the source files are.  Now we want to generate some
+#    other lists (such as objects, executables, and dependency files)
+#    by manipulating the lists of source files
+
+# LIBOBJS is a list of objects to put in the client lib and LIBDEPENDS is a list of dependencies
+LIBOBJS := $(patsubst %.c,%.o, $(filter %.c,$(LIBSRC)))
+LIBDEPENDS := $(patsubst %.c,%.d, $(filter %.c,$(LIBSRC)))
+
+# CAPFSDOBJS is a list of object to put in the client daemon and CAPFSDDEPENDS is a list of dependencies
+CAPFSDOBJS := $(patsubst %.c,%.o, $(filter %.c,$(CAPFSDSRC)))
+CAPFSDDEPENDS := $(patsubst %.c,%.d, $(filter %.c,$(CAPFSDSRC)))
+
+# MGROBJS is a list of object to put in the meta-server daemon and MGRDEPENDS is a list of dependencies
+MGROBJS := $(patsubst %.c,%.o, $(filter %.c,$(MGRSRC)))
+MGRDEPENDS := $(patsubst %.c,%.d, $(filter %.c,$(MGRSRC)))
+
+# IODOBJS is a list of object to put in the data-server daemon and IODDEPENDS is a list of dependencies
+IODOBJS := $(patsubst %.c,%.o, $(filter %.c,$(IODSRC)))
+IODDEPENDS := $(patsubst %.c,%.d, $(filter %.c,$(IODSRC)))
+
+KERNAPPOBJS := $(patsubst %.c,%.o, $(filter %.c,$(KERNAPPSRC)))
+KERNAPPDEPENDS := $(patsubst %.c,%.d, $(filter %.c,$(KERNAPPSRC)))
+KERNAPPS := $(patsubst %.c,%, $(filter %.c,$(KERNAPPSRC)))
+
+UTILSOBJS := $(patsubst %.c,%.o, $(filter %.c,$(UTILSSRC)))
+UTILSDEPENDS := $(patsubst %.c,%.d, $(filter %.c,$(UTILSSRC)))
+UTILS := $(patsubst %.c,%, $(filter %.c,$(UTILSSRC)))
+
+PLUGINPICOBJS := $(patsubst %.c,%.po, $(filter %.c,$(PLUGINSRC)))
+PLUGINDEPENDS := $(patsubst %.c,%.d, $(filter %.c,$(PLUGINSRC)))
+PLUGINPICS := $(patsubst %.c,%.so, $(filter %.c,$(PLUGINSRC)))
+
+# DEPENDS is a global list of all of our dependency files.  
+# NOTE: sort is just a trick to remove duplicates; the order
+#   doesn't matter at all.
+DEPENDS := $(sort $(LIBDEPENDS) $(CAPFSDDEPENDS) $(MGRDEPENDS) $(IODDEPENDS) $(KERNAPPDEPENDS) $(UTILSDEPENDS) $(PLUGINDEPENDS)) 
+
+# default rule builds both the servers, libraries and the client side daemon
+all:: $(SERVER) $(LIBRARIES) kernapps $(UTILS) $(PLUGINPICS)
+
+# target for building kernel driver userland programs
+kernapps: $(KERNAPPS) $(CLIENT)
+
+# Build linux-2.4 kernel module 
+LINUX_KERNEL_SRC = @LINUX_KERNEL_SRC@
+
+# Build linux-2.6 kernel module
+LINUX26_KERNEL_SRC = @LINUX26_KERNEL_SRC@
+
+.PHONY: kmod kmod26
+kmod: kernapps
+	@$(MAKE) --no-print-directory -C vfs
+
+kmod26: kernapps
+	@$(MAKE) --no-print-directory -C vfs26
+
+# Just like dir, but strip the slash off the end, to be pretty.
+dirname = $(patsubst %/,%,$(dir $(1)))
+
+# Generate the canonical in-tree location of a file, given a possibly
+# out-of-tree reference.
+canonname = $(patsubst $(srcdir)/%,%,$(call dirname,$(1)))
+
+# Grab any CFLAGS defined by the make stub for a particular file, and
+# for the directory in which the source resides.
+# Always add the source directory in question for "local" includes.
+# Similar for ldflags.
+modcflags = $(MODCFLAGS_$(call canonname,$(1))) \
+            $(MODCFLAGS_$(patsubst $(srcdir)/%,%,$(1))) \
+	    -I$(srcdir)/$(call dirname,$(1))
+modldflags = $(MODLDFLAGS_$(call canonname,$(1))) \
+             $(MODLDFLAGS_$(patsubst $(srcdir)/%,%,$(1)))
+
+# rule for building the meta data server
+meta-server/mgr_prot_server: client/capfsd_prot.h meta-server/mgr_prot.h $(MGROBJS) libs/libcapfs.a
+	$(Q) "  LD		$@"
+	$(E)$(LD) $(MGROBJS) -o $@ $(LDFLAGS) $(LIBS)
+
+data-server/iod_prot_server: data-server/iod_prot.h $(IODOBJS) libs/libcapfs.a
+	$(Q) "  LD		$@"
+	$(E)$(LD) $(IODOBJS) -o $@ $(LDFLAGS) $(LIBS)
+
+client/capfsd: client/capfsd_prot.h $(CAPFSDOBJS) libs/libcapfs.a
+	$(Q) "  LD		$@"
+	$(E)$(LD) $(CAPFSDOBJS) -o $@ $(LDFLAGS) $(LIBS)
+
+$(UTILS): %: %.o
+	$(Q) "  LD		$@"
+	$(E)$(LD) $< $(LDFLAGS) $(LIBS) -o $@
+
+$(PLUGINPICS): %.so: %.po
+	$(Q) "  LDSO		$@"
+	$(E)$(INSTALL) -d client/plugins
+	$(E)$(LDSHARED) -o $@ $<
+
+libs/libcapfs.a: meta-server/mgr_prot.h data-server/iod_prot.h client/capfsd_prot.h $(LIBOBJS)
+	$(Q) "  RANLIB	$@"
+	$(E)$(INSTALL) -d libs
+	$(E)ar rcs $@ $(LIBOBJS)
+
+# special rule to make sure mgr_prot.h is constructed for mount binary
+$(KERNAPPOBJS): %.o : %.c meta-server/mgr_prot.h
+	$(Q) "  CC		$@"
+	$(E)$(CC) $(call modcflags,$<) $(CFLAGS) $(call modcflags,$<) $< -c -o $@
+
+#special rule to make sure mount binary can be linked without the explicit dependancy
+$(KERNAPPS): %: %.o
+	$(Q) "  LD		$@"
+	$(E)$(LD) -o $@ $< $(call modldflags,$<) $(LDFLAGS) $(LIBS) 
+
+# default rule for building executables from object files
+%: %.o $(LIBRARIES)
+	$(Q) "  LD		$@"
+	$(E)$(LD) -o $@ $< $(call modldflags,$<) $(LDFLAGS) $(LIBS) 
+
+# default rule for building objects 
+%.o: %.c
+	$(Q) "  CC		$@"
+	$(E)$(CC) $(call modcflags,$<) $(CFLAGS) $(call modcflags,$<) $< -c -o $@
+
+# default rule for building shared objects
+%.po: %.c
+	$(Q) "  CCPIC		$@"
+	$(E)$(CC) $(call modcflags,$<) $(CFLAGS) $(PICFLAGS) $(call modcflags,$<) $< -c -o $@
+
+# generating C sources from RPC interface definitions
+%_clnt.c: %.x %.h
+	$(Q) "  RPCGEN[C]	$@"
+	$(E)$(RPCGEN) $(RPCGENFLAGS) -l $< > $@
+
+%_xdr.c: %.x %.h
+	$(Q) "  RPCGEN[X]	$@"
+	$(E)$(RPCGEN) $(RPCGENFLAGS) -c $< > $@
+
+%_svc.c: %.x %.h
+	$(Q) "  RPCGEN[S]	$@"
+	$(E)$(RPCGEN) $(RPCGENFLAGS) -m $< > $@
+
+%.h: %.x
+	$(Q) "  RPCGEN[H]	$@"
+	$(E)$(RPCGEN) $(RPCGENFLAGS) -h $< > $@
+
+# handy rule to generate cpp-output file, for debugging
+.PHONY: FORCE
+
+%.i: %.c FORCE
+	$(Q) "  CPP		$@"
+	$(E)$(CC) $(call modcflags,$<) $(CFLAGS) $(call modcflags,$<) $< -E -o $@
+
+# all applications depend on the libcapfs library
+$(UTILS): %: %.o $(LIBRARIES)
+$(KERNAPPS): %: %.o $(LIBRARIES)
+
+# rule for generating cscope information
+cscope:
+	find @SRC_ABSOLUTE_TOP@ -iname "*.[ch]" \
+		 > $(srcdir)/cscope.files
+	( cd @SRC_ABSOLUTE_TOP@; cscope -be -i @SRC_ABSOLUTE_TOP@/cscope.files )
+
+# build editor tags file over all source files *.[ch] 
+tags:
+	( find $(addprefix $(srcdir)/,$(MODULES)) . \
+	    $(srcdir)/vfs \
+	    -maxdepth 1 -name '*.[ch]';\
+	) | ctags --excmd=pattern -B --langmap=c:+.sm -I __hidden,DOTCONF_CB -L-
+
+# top rule for cleaning up tree
+clean:: 
+	$(Q) "  CLEAN"
+	$(E)rm -f $(LIBOBJS) $(CAPFSDOBJS) $(MGROBJS) $(IODOBJS) $(KERNAPPOBJS) $(UTILSOBJS) $(PLUGINPICOBJS)\
+		$(LIBRARIES) $(DEPENDS) $(SERVER) $(CLIENT) $(KERNAPPS) \
+		$(UTILS) $(PLUGINPICS)
+	@find . -name "*prot.h" -exec rm \{\} \;
+	@find . -name "*prot_svc.c" -exec rm \{\} \;
+	@find . -name "*prot_clnt.c" -exec rm \{\} \;
+	@find . -name "*prot_xdr.c" -exec rm \{\} \;
+
+clean::
+	@$(MAKE) --no-print-directory -C vfs clean
+	@$(MAKE) --no-print-directory -C vfs26 clean
+
+cleaner: clean
+	rm -f tags
+	rm -f vfs/Makefile
+	rm -f vfs26/Makefile
+	rm -f $(srcdir)/cscope.out $(srcdir)/cscope.files
+	rm -f config.log config.status config.cache 
+
+# _really_ clean the tree; should go back to pristine state
+distclean: cleaner
+	find . -name "module.mk" -exec rm \{\} \;
+	rm -f Makefile capfs-header.h
+
+# this is where we include all of our automatic dependencies.
+# NOTE: we wrap this in ifneq's in order to prevent the
+#    dependencies from being generated for special targets that don't 
+#    require them
+ifeq (,$(filter clean distclean cscope tags nodep,$(MAKECMDGOALS)))
+-include $(DEPENDS)
+endif
+# add this as a make goal to disable rebuilding dependencies
+.PHONY: nodep
+nodep:; @:
+
+# default rule for generating dependency files
+#%.d: %.c
+#	$(Q) "  DEP		$@"
+#	$(E)touch $@
+

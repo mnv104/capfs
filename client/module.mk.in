@@ -1,0 +1,18 @@
+DIR := client/
+
+LIBSRC += \
+			 $(DIR)/capfsd_prot_clnt.c $(DIR)/capfsd_prot_xdr.c
+
+CAPFSDSRC += \
+			$(DIR)/capfsd.c $(DIR)/capfs_v1_xfer.c $(DIR)/map_chunk.c $(DIR)/capfsd_prot_server.c \
+			$(DIR)/capfsd_prot_svc.c $(DIR)/capfsd_prot_xdr.c $(DIR)/plugin.c
+
+KERNAPPSRC += \
+			$(DIR)/mount.capfs.c
+
+MODCFLAGS_$(DIR)/capfsd_prot_xdr.c = -Wno-unused 
+
+GENSRCS := \
+			$(DIR)/capfsd_prot_clnt.c $(DIR)/capfsd_prot_xdr.c $(DIR)/capfsd_prot.h $(DIR)/capfsd_prot_svc.c
+
+.SECONDARY: $(GENSRCS)

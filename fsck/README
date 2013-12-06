@@ -1,0 +1,48 @@
+ --- PVFS V1 File System Consistency Checking Tool ---
+
+Originally, this code started out as the PVFS V1 file system consistency
+checking tool.
+The PVFS file system consistency checker tool was structured as an
+MPI application, that runs on the same nodes as that of the MGR
+and the IOD daemons that constitute the PVFS v1 file system that is
+currently being checked for inconsistencies. Throughout the rest of 
+this discussion, we will shall therefore use the following terms interchangeably,
+We refer to the rank 0 task of this MPI program as the MGR task, since it
+runs on the same node as that of the MGR daemon and the rest of the non-zero
+rank tasks of this MPI program are referred to as the IOD tasks. 
+
+The consistency checker tool has been structured as a 2-phase recovery
+protocol. In phase 1, the MGR task sends a bitmap of all files that it thinks
+the IOD nodes should have to the IOD tasks. Depending on the state of the IOD
+file system, the IOD tasks respond back with a bitmap which encompasses both what
+the MGR thinks is valid and what the IODs have. This concludes phase 1 of the protocol.
+In phase 2, the MGR task collates the bitmaps collected from all the IOD tasks, and
+decides on what action needs to be taken by consulting a simple truth-table like
+function that decides if the file needs to be recovered, or whether there is an error
+in the file, or whether the file is OK. This action is then further encoded into a
+bitmap and sent to the IOD tasks who are instructed to either keep the file as is,
+or delete the file. The IOD tasks on receiving this request, execute all the actions
+according to the bitmap, and respond to the MGR task with a response which concludes phase 2 
+of the recovery.
+
+IMPLEMENTATION NOTES:
+
+Bitmap encoding in phase 1 uses the following conventions;
+Use a 0 bit to indicate presence of a file and 1 for absence.
+
+Bitmap encoding in phase 2 uses the following conventions;
+Use a 0 bit to indicate "dont delete the file" and 1 to indicate "delete the file".
+
+However, if you really think about it, fsck'ing in PVFS v1 is 
+very similar to garbage collection in the CAPFS file system. In fact the
+garbage collection code subsumes consistency checking as well.
+The implementation details needed to be tweaked though, since I cannot
+do any more of the fancy bitmaps/truth-tables. Rather expensive lists
+of hashes have to be communicated.
+
+Status Update:
+
+This code is not yet ready for use. While the fsck part with pvfs v1 should work,
+we have not been able to complete the implementation of the garbage cleaner.
+
+Murali Vilayannur

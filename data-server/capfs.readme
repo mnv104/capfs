@@ -1,0 +1,21 @@
+1) File Name Format
+The file name presented to capfs is the SHA1 hash of the block. This
+results into a 160 bit file name. We use the first(leftmost) 4 bits to form
+a hex character. Then we are left with 156bits = 26*6 bits. So if we use
+base 64 (a language with 64 symbols) then we need 26 such characters. So
+to form such a language we choose the following symbols: {a-z}, {A-Z},
+{0-9}, { . _ } This results in a very NON-PORTABLE naming convention: many
+filesystems do not distinguish between two names based on capitalization.
+In any case the current prototype forms file names using this convention:
+H=hex, S=base64
+        HS/SSSSS...S
+     (dir)/(filename)
+ (2 chars)/(25 chars)
+This causes us to have 16*64 = 1024 top level directories. Each directory
+then has the constituent files.
+specifically:
+0-9: '0' - '9'
+10-35: 'a' - z'
+36-62: 'A' - 'Z'
+62: '_'
+63: '.'

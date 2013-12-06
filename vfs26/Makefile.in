@@ -1,0 +1,64 @@
+# 
+# Special Makefile for building kernel module.  Invoked both by user and
+# by kernel build process.
+#
+here = vfs26
+top  = ../
+absolute_src_dir = @SRC_ABSOLUTE_TOP@
+src_relative_top = @SRC_RELATIVE_TOP@
+
+ifeq "/" "$(shell echo ${src_relative_top} | cut -c 1)"
+# not actually relative (as if someone called /tmp/foo/configure
+#    instead of ../foo/configure)
+    relative_src_dir = ${src_relative_top}
+else
+    relative_src_dir = $(top)/${src_relative_top}
+endif
+
+QUIET_COMPILE = @QUIET_COMPILE@
+ifdef V
+    QUIET_COMPILE = 0
+endif
+
+ifeq ($(QUIET_COMPILE),1)
+  # say a one-line description of the action, do not echo the command
+  Q=@echo
+  E=@
+else
+  # do not say the short Q lines, but do echo the entire command
+  Q=@echo >/dev/null
+  E=
+endif
+
+TARGET = capfs.o
+KERNEL_SOURCES=capfs_mod.c file.c dir.c inode.c ll_capfs.c symlink.c \
+capfs_bufmap.c capfs_sysctl.c capfsdev.c capfs-cache.c
+KERNEL_OBJECTS = $(KERNEL_SOURCES:.c=.o)
+KERNEL_DEPENDANCIES = $(KERNEL_SOURCES:.c=.d)
+KERNEL_PREPROC = $(KERNEL_SOURCES:.c=.i)
+KERNEL_ASSEMBLED = $(KERNEL_SOURCES:.c=.s)
+OTHERGEN=capfs.o capfs.ko capfs.mod.c capfs.mod.o
+OTHERGENDIR=.tmp_versions # 2.6 kernels generate this stuff
+COMMANDS=$(patsubst %,.%.cmd,$(KERNEL_OBJECTS) $(OTHERGEN))
+
+ifneq ($(KERNELRELEASE),)
+obj-m += capfs.o
+capfs-objs := $(KERNEL_OBJECTS)
+
+EXTRA_CFLAGS = \
+	-I$(absolute_src_dir)/ \
+	-I$(absolute_src_dir)/lib \
+	-I$(here) -DCAPFS_SERIALIZE_DCACHE $(CAPFS_ARCH_CFLAGS)
+else
+
+KDIR := @LINUX26_KERNEL_SRC@
+PWD := $(shell pwd)
+
+default: 
+	$(E)$(MAKE) -C $(KDIR) SUBDIRS=$(PWD) modules
+
+clean:
+	$(E)rm -f *.o config.cache *.d *~ $(COMMANDS) $(OTHERGEN) 
+	$(E)rm -rf $(OTHERGENDIR)
+
+endif

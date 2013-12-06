@@ -1,0 +1,16 @@
+CC=@CC@
+LD=@CC@
+CFLAGS=-I ../../../shared
+LFLAGS=-L ../../../libs -lcapfs @SSLLIBS@ -lpthread -lnsl
+
+all: chunk
+
+chunk: chunk.o 
+	$(LD) chunk.o -o $@ $(LFLAGS)
+
+chunk.o: chunk.c
+	$(CC) $< $(CFLAGS) -c -o $@
+
+clean:
+	rm -f chunk.o chunk
+	

@@ -1,0 +1,199 @@
+SUMMARY
+-------
+This package implements a VFS interface to CAPFS for the Linux 2.6
+kernels.
+
+This code is a rewrite/forward port of the 2.4 kernel module code of PVFS originally
+by Phil Carns and Robert Ross for PVFS.
+
+See the INSTALL file for more details on how to proceed with
+installation.
+
+There are three components of note here.  The first is the kernel
+module itself, which will provide the VFS functions and CAPFS device
+necessary to access the system.  Second is the user space CAPFS client
+daemon (capfsd), which handles communication with the CAPFS file system.
+Last is the mount.capfs command, which handles mounting CAPFS file systems.
+
+USAGE
+-----
+There are three steps for mounting CAPFS file systems (these
+examples assume you are currently in the capfs-kernel build
+directory and are logged in as root):
+
+1) Load the CAPFS module.  See the notes below on the module options.
+
+insmod ./capfs.ko
+
+If the insmod fails, please check the INSTALL file for common
+errors and suggestions for correcting them.
+
+2) Start the CAPFS daemon.
+
+./capfsd
+
+3) Mount the CAPFS file system (after creating the mountpoint).
+
+./mount.capfs <manager>:<metadata_dir> <mountpoint>
+
+For example, I'm running a CAPFS file system manager on a machine "foo"
+here.  The manager is storing metadata in /capfs-meta on machine "foo".
+I want to mount the CAPFS file system in the directory /mnt/capfs on my
+local machine:
+
+./mount.capfs hell:/capfs-meta /mnt/capfs
+
+That's it.  You should be able to access files on the CAPFS file system
+as usual.  When you want to unmount the file system, use "umount" as
+usual.
+
+NOTE:
+If you have a version of util-linux that is 2.10f or later, "mount" will
+automatically look for a fs-specific mount program in /sbin.  So, if you
+install mount.capfs in /sbin, you can put capfs entries in /etc/fstab and use
+"mount" to mount them.
+
+*NEW NOTE*: 
+'make install' will install mount.capfs into ${PREFIX}/sbin/mount.capfs, with
+$PREFIX defaulting to /usr/local.  This is a change from earlier versions.
+Install mount.capfs by hand to /sbin if you want the fstab + "mount" trick
+mentioned above to work.
+
+MODULE OPTIONS
+--------------
+The module will accept an optional debug parameter, which will turn on
+logging of various types of debugging information.  This is specified on
+insmod (eg. "insmod capfs debug=0x077").  The values of the various
+message types are described in capfs_kernel_config.h.  Using 0x3ff will
+get pretty much all the messages.  By default you only get error
+messages.
+
+The maximum request size, in bytes, is settable via the "maxsz" parameter
+(eg.  "insmod capfs maxsz=33554432").  By default this is 16MB.  This can
+be used to restrict the total amount of memory the CAPFS module is
+willing to use.  All requests that are larger than this size will be
+split into one or more requests of the maximum size and one to request
+the remainder.
+
+The buffering technique used to move data between applications and the
+capfsd is also selectable via the "buffer" parameter.  There are three
+valid options: static, dynamic, and mapped.  With the static technique,
+a static buffer is allocated when the module is loaded.  This buffer is
+the same size as the maximum request size.  With the dynamic approach, a
+new buffer is allocated each time a request is made and freed when the
+request finished.  With the mapped approach, the kernel rawio
+functinality is used to map user pages and eliminate an extra
+buffer copy.
+
+The mapped option is only available with kernels that do not have
+the "highmem" kernel configuration option enabled.
+
+Note that all the options may be used at the same time, so that:
+
+insmod capfs debug=0x3ff maxsz=33554432 buffer=mapped
+
+would enable more debugging output, set the maximum request size to
+32MB, and turn on the mapped buffering technique.
+
+Finally, a single-line message is printed to the kernel logs when the
+module is loaded, indicating the settings applied.
+
+
+LOGGING AND DEBUGGING
+---------------------
+There are two places where this system logs.  First, the kernel module
+will be spitting out logging information that will end up in your system
+logs.  Second, the capfsd will be logging information into
+/tmp/capfsdlog.XXXXXX.  Both of these sources are potentially useful for
+finding bugs.
+
+
+EXPERIMENTAL FEATURES: 
+---------------------
+
+/proc statistics:
+----
+
+The CAPFS kernel module provides several statistics and controls
+which can be found in the /proc/sys/capfs directory.  The following
+list summarizes how to interact with each entry: 
+
+debug: This indicates the current debugging level for the
+  CAPFS module.  The value may be read (for example, "cat debug"),
+  or written (for example, "echo "0" > debug") in order to change
+  the debugging level at runtime.  It uses the same values as the
+  debug= module parameter documented above.
+io_size: This indicates the current buffer size being used for
+  I/O through the kernel module.  It may be read (for example,
+  "cat io_size") or written (for example, "echo "16777216" >
+  io_size) to change the buffer size at runtime.
+collect_stats: This indicates if statistics gathering is enabled
+  or not for the CAPFS module.  "echo "1" > collect_stats" enables
+  statistics gathering, while "echo "0" > collect_stats" turns it
+  off.
+vfs_stats: This displays statistics about VFS level operations
+  within the CAPFS kernel module.  The left column shows the
+  name of the function while the right column shows the number of 
+  times that it has been called.  "echo "1" > vfs_stats" resets
+  all of the statistics shown in this file to zero.
+upcall_stats: This displays statistics about each upcall used in
+  the CAPFS kernel.  Upcalls are low level requests between the CAPFS VFS
+  implementation and the capfsd.  Upcall statistics are not
+  enabled by default (even with collect_stats turned on).  "echo "1" >
+  upcall_stats" to enable and/or reset them.  The first column
+  shows the upcall name, the second column shows the number of times
+  it has been issued, the third column shows the average time that each
+  upcall has taken to complete, and the fourth column shows the standard
+  deviation of the timings.
+
+CAVEATS
+-------
+
+- Multiple capfsds should not be used at this time.
+
+- The capfsd can potentially run out of open file descriptors if too
+  many files are opened simultaneously.  If it does application tasks
+  will have I/O operations fail.  I put in a workaround for this, but it
+  doesn't work yet <smile>.  There is a timeout mechanism built into the
+  capfsd that will, after about a minute, get things back to sane.  I know
+  that isn't really a solution, but it's all you get for the moment.
+
+- If a mgr or iod dies, the capfsd will hold on to the open FD until the
+  first instance of a failed attempt to use the FD.  This results in the
+  TCP connection lying around in FIN_WAIT2, which makes it impossible to
+  reasonably restart the daemons.  The appropriate action here is to try
+  an operation that uses the capfsd; it will fail, the connection will be
+  closed, and the daemon can be restarted.
+
+
+FILES
+-----
+For your information, here's a summary of the files:
+
+README - this file
+INSTALL - notes on installation and potential warnings/errors
+Makefile - makefile provides the build instructions for the CAPFS VFS code.
+dir.c - VFS directory operations
+file.c - VFS file operations
+inode.c - VFS inode operations
+ll_capfs.c - implementation of low-level VFS operations
+ll_capfs.h - header for low-level CAPFS interface
+mount.capfs.c - CAPFS mount command
+capfs_linux.h - header for linux-specific defines
+capfs_mod.c - wrapper calls to define exported symbols for the module
+capfsdev.c - capfsd device implementation
+capfsdev.h - prototype for capfsdev
+capfs_kernel_config.h - configuration parameters for the CAPFS kernel module
+config.h.in - used by configure to create config.h
+configure.in - used by autoconf to create configure script
+test/ - test code, probably useless to you
+
+
+THANKS
+------
+
+Thanks to my advisor Dr. Anand Sivasubramaniam for funding me through
+the  course of this project and beyond.
+
+
+-- Murali Vilayannur.

@@ -1,0 +1,35 @@
+# Compiler flags 
+CC = @MPI_BINARY_PATH@/mpicc
+CPPFLAGS += -D_REENTRANT -D_GNU_SOURCE
+CFLAGS += -g -I @MPI_HEADER_PATH@ -MMD
+LDLIBS += @MPI_LIBRARY_SEARCH_PATH@ -lmpich
+
+# Targets 
+
+SRCS=racer.c
+OBJS=$(SRCS:.c=.o)
+DEPS=$(SRCS:.c=.d)
+ASS=$(SRCS:.c=.s)
+PRES=$(SRCS:.c=.i)
+
+all : racer
+
+racer: $(OBJS)
+	$(CC) $^ -o $@
+
+%.o: %.c
+	$(CC) $(CPPFLAGS) $(CFLAGS) -c $< -o $@
+
+%.s: %.c
+	$(CC) $(CPPFLAGS) $(CFLAGS) -S $< -o $@
+
+%.i: %.c
+	$(CC) $(CPPFLAGS) $(CFLAGS) -E $< -o $@
+
+%.d: %.c
+	@touch $@
+
+clean:
+	 $(RM) core *.o *~ *.d
+
+-include $(DEPS)

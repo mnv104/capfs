@@ -1,0 +1,5 @@
+DIR := libcas/
+
+LIBSRC += $(DIR)/client_ops.c
+
+MODCFLAGS_$(DIR)/client_ops.c = -D_POSIX_C_SOURCE=200112

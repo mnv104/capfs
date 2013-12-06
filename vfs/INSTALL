@@ -1,0 +1,141 @@
+1) INSTALLATION NOTES
+-------------------------
+
+You must have properly configured kernel headers installed for the
+kernel version that you are using!  This is very important for
+correct operation.  See section 2) for details.
+
+2) CONFIGURING YOUR KERNEL HEADERS
+-------------------------
+
+NOTE: Some advanced users may wish to intentionally compile 
+vfs code against a kernel version that is not currently running
+on your system.  Please skip to step 3) for information on this
+topic.
+
+Many distributions do not come configured by default with kernel
+headers that match the running kernel on the system.  This problem
+must be corrected before continuing.
+
+If you think that your kernel headers are configured properly, then
+you may skip to step 4) and continue, but watch out for warnings from
+the configure process which may indicate that something is wrong.  (The
+configure script for this package will attempt to detect discrepancies
+between your running kernel and the currently installed headers.)
+
+For more detailed information, please consult your vendor's
+documentation or visit the Linux kernel HOWTO at:
+
+http://www.tldp.org/HOWTO/Kernel-HOWTO.html
+
+The kernel headers for your system can normally be accessed through
+either /lib/modules/<uname -r>/build/include/ or
+/usr/src/linux-<version>/include/ ).
+
+If these headers are not present, then your first step should be
+to install the proper kernel source for your system.  If you are
+using a kernel provided by your distribution vendor, then you
+should look for a package called kernel-source from your
+installation media.  If you are using a custom compiled kernel,
+then the stock sources can be found at http://www.kernel.org.
+
+Once the proper kernel source is installed, you must carry out a
+few steps to insure that the features enabled in the headers match the
+kernel that you are using.  This usually means setting up the
+correct .config file in the kernel source and running "make
+oldconfig; make deps" within the sources.
+
+USE THE FOLLOWING EXAMPLE TIPS AT YOUR OWN RISK:
+(please back up your kernel source files)
+
+- For Redhat 7.3, the normal sequence of events to configure your
+  kernel source may look something like this:
+
+  a) install kernel-source from rpm
+  b) cd /usr/src/linux-<version>/configs/
+  c) find the config file that matches your system
+  d) cp <config file> ../.config
+  e) cd ../
+  f) make oldconfig
+  g) make deps
+
+- For SuSE 8.0, the normal sequence of events to configure your
+  kernel source may look something like this:
+
+  a) install kernel-source from rpm
+  b) cd /usr/src/linux-<version>/
+  c) make mrproper
+  d) cp /boot/vmlinuz.confg .config
+  e) make oldconfig
+  f) make deps
+
+3) CONFIGURING FOR A KERNEL THAT IS NOT 
+   CURRENTLY RUNNING ON THE MACHINE
+-------------------------
+
+If you wish to compile for a kernel version that is not currently
+running on your system (for example, if you must use a different
+build host than the cluster nodes on which the software will be
+used), then you must take special precautions.
+
+First, install the source for the kernel that you wish to build
+against somewhere on your system, and make sure that the headers
+are configured correctly.
+
+Now, follow the steps outline in section 4) as usual, but add the
+"--with-kernel-headers=<dir>" option to configure.  This will
+override the default path in which build process will look for
+kernel headers.
+
+When you run configure, it may issue warnings about the
+configuration mismatches between the running kernel and the kernel
+headers.  These warnings may be disregarded in this case.
+
+4) INSTALLATION
+-------------------------
+
+Run the following as root:
+
+make install
+cp capfs.o <wherever you want to put the kernel module>
+
+This will install mount.capfs and capfsd in the default system
+locations.  
+
+5) RUNNING the VFS code for CAPFS
+-------------------------
+
+Please see the README file.
+
+6) POSSIBLE PROBLEMS
+-------------------------
+
+a) **********************************************************
+Autoconf has detected that you are compiling against
+kernel headers that do not match the currently running
+kernel (see preceeding warnings).  If this is not the desired
+behavior then please make sure that your kernel headers are
+configured properly and rerun configure (see INSTALL).
+**********************************************************
+
+  If you see this message at the end of the configure process,
+  then please verify that your kernel headers are installed and
+  configured properly.  See section 3).
+
+b) unresolved symbols when trying to insmod the capfs module
+
+  You have most likely compiled with inappropriate kernel headers
+  specified.  You will need to get the right headers in place and
+  then recompile the vfs code.  See section 3).
+
+c) /usr/include/linux/modversions.h:1:2: #error Modules should never use
+   kernel-headers system headers,
+   /usr/include/linux/modversions.h:2:2: #error but headers from an
+   appropriate kernel-source
+
+	Probably your kernel headers are not in the correct path, and
+	the include path is defaulting to /usr/include/linux.  This
+	is not the desired behavior on most 2.4 kernel systems, and
+	this error message is accurate.  Please make sure that your
+	real kernel headers are installed in the correct place.
+

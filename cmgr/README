@@ -1,0 +1,148 @@
+--- Architecture of the buffer manager/cache ---
+
+The way this code is architected is that it is a 2-level design, where
+the lower level is a general purpose cache manager that buffers
+objects of size BSIZE bytes (tuneable parameter), upto BCOUNT number
+of objects. In case the number of objects is > than BCOUNT, some kind
+of LRU-like replacement algorithm is run to evict some object.
+Since the lower level layer is oblivious to the kind of object
+that is being cached (for instance these could be data of a file,
+or hashes of a file or whatever), the higher level layer
+that hooks into this lower level needs to provide hooks that can be invoked.
+But the key point is that this can only cache objects that are closely related
+to a file.
+
+The higher level layer can implement any desired functionality (basically
+it needs to plugin to the lower level layer using the following
+interfaces exported by the lower layer).
+
+typedef struct {
+	char *co_output_fname;
+	int co_bsize;
+	int co_bcount;
+	int co_block_table_size;
+	int co_file_table_size;
+	int co_handle_size;
+	/* compare_block & block_hash are optional routines */
+	int (*compare_block)(void *given_key, void *old_key);
+	int (*block_hash)(void *key);
+	int (*compare_file)(void *given_key, void *old_key);
+	int (*file_hash)(void *key);
+	long (*readpage_begin)(cm_handle_t p, 
+		int number, cm_buffer_t *buffers, size_t *sizes, int64_t *offsets);
+	int* (*readpage_complete)(long _uptr);
+	long (*writepage_begin)(cm_handle_t p, 
+		int number, cm_buffer_t *buffers, size_t *sizes, int64_t *offsets);
+	int* (*writepage_complete)(long _uptr);
+} cmgr_options_t;
+
+The above structure needs to be passed by the higher level layer at the time
+of CMGR_init(); The first few parameters are straightforward, number of objects,
+hash table sizes etc etc. Handle size is the number of bytes of the opaque identifier
+that is used to determine if it is indeed a cache hit or not (i.e handle is used
+for object comparison in the cache). The upper level layer needs to provide
+callback routines 
+a) compare_block/block_hash: are optional callbacks
+that determines if 2 objects stored in the cache are identical and for hashing.
+b) compare_file/file_hash are callbacks that
+can determine if the file to which the objects belong to are identical or not.
+c) readpage_begin/complete are callbacks that are invoked by the lower-level
+on a read that missed in the cache. It is upto the high level to issue whatever
+operations necessary to bring the object into the cache.
+d) writepage_being/complete are analogous operations when any objects that have been
+locally modified need to be written out due to memory pressure in the cache.
+
+The main routines exposed by the lower level eventually are simple gets/puts.
+extern int64_t			CMGR_get_region(char *buffer, cm_handle_t p,
+				    int64_t begin_byte, int64_t count, cmgr_synch_options_t *options);
+extern int64_t			CMGR_put_region(char *buffer, cm_handle_t p,
+				    int64_t begin_byte, int64_t count, cmgr_synch_options_t *options);
+
+	--------- Example implementations of the Higher-level libraries --------
+
+a) POSIX-I/O Higher Level layer 
+
+For instance one implementation of a higher-level layer is a cache for normal
+UNIX files that can transparently capture file I/O operations and feed them from the
+cache directly.
+This uses the LD_PRELOAD feature provided in Linux and many other UNIX variants
+and basically you just export LD_PRELOAD=libio.so, any subsequent application
+spawned from the shell thereafter will make use of the cache. Obviously,
+the cache contents will be erased when the app. exits.
+
+********** Influential Environment Variables for this Library *********
+
+a) LD_PRELOAD = <path>/libio.so
+	Will hijack file system calls to the buffer manager.
+
+b) CMGR_DEBUG = <whatever/something/anything>
+	Will output lots of debugging print statements.
+
+c) CMGR_STATS = <whatever/something/anything>
+	Will display the final cache manager statistics.
+
+d) CMGR_OUTPUT = <name of the output file>
+	Will dump all the output to this file instead of dumping them to 
+	standard output or error.
+
+e) CMGR_BFTSIZE = <some number>
+	Will set the size of the file hash table to the specified number.
+
+f) CMGR_BTSIZE = <some number>	
+	Will set the size of the block hash table to the specified number.
+
+g) CMGR_BCOUNT = <some number>
+	Will set the size of the buffer manager to the specified number.
+
+h) CMGR_BSIZE = <some number>
+	Will set the size/granularity of management of the buffer manager.
+
+i) CMGR_LOCK_DEBUG = <whatever/something/anything>
+	Will print debug output related to locking.
+
+
+NOTE: Limitations.
+
+I don't think this will work if a process calls
+fork() and then subsequently calls exec(). This approach 
+seems to work for programs that do the I/O themselves 
+and don't use any fancy features.
+Examples of programs that do work
+a) cp, tar, vim
+
+Examples of programs that don't seem to work this way
+a) gcc, tar with zj option, make.. and probably many
+more that call fork() and exec().
+Will need to figure out why that does not work!
+
+New! Added support for making mmap's coherent with the file-cache contents.
+
+b) Content-Addressable cache support for caching crypto-hashes of a file.
+
+In the CAPFS file system, the client needs to keep track of the hashes
+of a particular file for performance reasons. Consequently, we need to be able
+to cache them at the client-side and also be able to keep it coherent.
+The 2nd example implementation does exactly this
+and offers 2 main simple primitives namely,
+
+extern int hcache_get(char *fname, int64_t begin_chunk, int64_t nchunks, void *buf);
+extern int hcache_put(char *fname, int64_t begin_chunk, int64_t nchunks, const void *buf);
+
+Note that the cache needs to be told of the chunk_size, i.e the unit at which the
+file is assumed to be chunked, or else things wont work correctly.
+this can be done by setting an additional environment variable.
+Consequently, all the above env. variables and this one are recognized by this 
+implementation.
+
+CMGR_CHUNK_SIZE - Sets the chunk size at which the file is assumed to be hashed.
+This is called the hcache in CAPFS terminology.
+
+c) Content-Addressable Cache that allows data to be cached and indexed using
+their contents' cryptographic hashes. Note that this caches the data associated
+with the file, while (b) caches the hashes themselves.
+This is called the dcache in CAPFS terminology.
+
+
+-Murali Vilayannur
+(vilayann@cse.psu.edu)
+

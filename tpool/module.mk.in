@@ -1,0 +1,4 @@
+DIR := tpool/
+
+LIBSRC += \
+	$(DIR)/tp_impl.c $(DIR)/tp_pool.c $(DIR)/tp_proto.c

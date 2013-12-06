@@ -1,0 +1,370 @@
+dnl **************************************************************
+dnl CAPFS AUTOCONF SCRIPT
+dnl
+dnl Process this file with autoconf to produce a configure script.
+dnl You may need to use autoheader as well if changing any DEFINEs
+
+AC_INIT(lib/capfs_config.h)
+AC_CONFIG_HEADER(capfs-header.h)
+AC_CONFIG_AUX_DIR(scripts)
+
+dnl CAPFS versioning information	
+CAPFS_MAJOR=0
+CAPFS_MINOR=9
+CAPFS_SUB=0
+CAPFS_PRE=""
+
+AM_INIT_AUTOMAKE(capfs, $CAPFS_MAJOR, $CAPFS_MINOR, $CAPFS_SUB$CAPFS_PRE)
+
+CAPFS_VERSION=$CAPFS_MAJOR.$CAPFS_MINOR.$CAPFS_SUB$CAPFS_PRE	
+AC_SUBST(CAPFS_VERSION)
+AC_DEFINE_UNQUOTED(CAPFS_VERSION_MAJOR, $CAPFS_MAJOR, major version number)
+AC_DEFINE_UNQUOTED(CAPFS_VERSION_MINOR, $CAPFS_MINOR, minor version number)
+AC_DEFINE_UNQUOTED(CAPFS_VERSION_SUB, $CAPFS_SUB, sub version number)
+
+dnl Checks for host type
+dnl Ensures we can compile on this OS
+
+AC_CANONICAL_HOST
+
+AC_MSG_CHECKING(whether we know how to compile for this OS)
+if test x$host_os != xlinux-gnu; then AC_MSG_ERROR($host_os not supported.)
+else AC_MSG_RESULT(yes)
+fi
+
+dnl Reduce x86 variations to a single detectable thing
+case x$host_cpu in
+  xi386 | xi486 | xi568 | xi686)
+    host_cpu=x86
+    ;;
+esac
+
+dnl Check if we need extra compiler flags for this arch
+dnl Not really sure what the right flags are for alphas
+AC_MSG_CHECKING(whether we need to add some compile flags for $host_cpu)
+if test x$host_cpu = xalphaev6; then 
+	CAPFS_ARCH_CFLAGS="-fomit-frame-pointer -fno-strict-aliasing -pipe \
+	   -mno-fp-regs -ffixed-8 -mcpu=ev5 -Wa,-mev6 -DBITS_PER_LONG=64 -DBYTES_PER_LONG=8"
+	AC_MSG_RESULT(yes)
+elif test x$host_cpu = xalphaev5; then
+	CAPFS_ARCH_CFLAGS="-fomit-frame-pointer -fno-strict-aliasing -pipe \
+	   -mno-fp-regs -ffixed-8 -mcpu=ev5 -Wa,-mev5 -DBITS_PER_LONG=64 -DBYTES_PER_LONG=8"
+	AC_MSG_RESULT(yes)
+elif test x$host_cpu = xalphaev56; then
+	CAPFS_ARCH_CFLAGS="-fomit-frame-pointer -fno-strict-aliasing -pipe \
+	   -mno-fp-regs -ffixed-8 -mcpu=ev5 -Wa,-mev6 -DBITS_PER_LONG=64 -DBYTES_PER_LONG=8"
+	AC_MSG_RESULT(yes)
+elif test x$host_cpu = xalphaev67; then
+	CAPFS_ARCH_CFLAGS="-DBITS_PER_LONG=64 -DBYTES_PER_LONG=8"
+	AC_MSG_RESULT(yes)
+elif test x$host_cpu = xia64; then
+	CAPFS_ARCH_CFLAGS="-ffixed-r13 -mfixed-range=f10-f15,f32-f127 -falign-functions=32 -DBITS_PER_LONG=64 -DBYTES_PER_LONG=8"
+	AC_MSG_RESULT(yes)
+elif test x$host_cpu = xx86 ; then
+	CAPFS_ARCH_CFLAGS="-mpreferred-stack-boundary=2 -DBITS_PER_LONG=32 -DBYTES_PER_LONG=4"
+	AC_MSG_RESULT(yes)
+elif test x$host_cpu = xx86_64 ; then
+	CAPFS_ARCH_CFLAGS="-mcmodel=kernel -DBITS_PER_LONG=64 -DBYTES_PER_LONG=8"
+	AC_MSG_RESULT(yes)
+elif test x$host_cpu = xppc ; then
+	CAPFS_ARCH_CFLAGS="-fsigned-char -msoft-float -pipe -ffixed-r2 -Wno-uninitialized -mmultiple -mstring -DBITS_PER_LONG=32 -DBYTES_PER_LONG=4"
+	AC_MSG_RESULT(yes)
+else
+	AC_MSG_RESULT(no)
+fi
+
+AC_SUBST(CAPFS_ARCH_CFLAGS)
+
+dnl Options for debugging
+AC_ARG_WITH(debug,
+[  --with-debug            Dump somewhat verbose debug output for diagnostics],
+CFLAGS="$CFLAGS -DDEBUG"
+)
+
+AC_ARG_WITH(verbose,
+[  --with-verbose          Dump extremely verbose debug output for diagnostics],
+CFLAGS="$CFLAGS -DDEBUG -DVERBOSE_DEBUG"
+)
+
+dnl options to specify path to plugins
+AC_ARG_WITH(plugins,
+[  --with-plugins          Specify path to plugins directory],
+if test x$withval = xyes; then
+  AC_MSG_ERROR(--with-plugins must be given a pathname)
+else
+	CFLAGS="$CFLAGS -DPLUGIN_DIR=$withval"
+fi
+)
+
+dnl Allow user to specify a directory for MPI library and includes
+AC_ARG_WITH(mpi,
+[  --with-mpi              Path to MPI installation for libraries and includes],
+if test x$withval = xyes; then
+  AC_MSG_ERROR(--with-mpi must be given a pathname)
+else
+	echo adding $withval/lib to library paths
+	[libmpi_search_path="-L$withval/lib"]
+	echo adding $withval/include to include paths
+	[mpi_header_path="-I$withval/include"]
+	echo adding $withval/bin to binary paths
+	[mpi_binary_path="$withval/bin"]
+	MPI_LIBRARY_SEARCH_PATH="$libmpi_search_path"
+	MPI_HEADER_PATH="$mpi_header_path"
+	MPI_BINARY_PATH="$mpi_binary_path"
+	AC_SUBST(MPI_LIBRARY_SEARCH_PATH)
+	AC_SUBST(MPI_HEADER_PATH)
+	AC_SUBST(MPI_BINARY_PATH)
+fi
+)
+
+dnl check for the MPI header files
+	CPPFLAGS_OLD="$CPPFLAGS"
+	CPPFLAGS="$CPPFLAGS $mpi_header_path"
+	AC_CHECK_HEADER(mpi.h, ,
+		AC_MSG_WARN("Must specify correct path to MPI install with --with-mpi")
+	)
+	CPPFLAGS="$CPPFLAGS_OLD"
+
+	dnl Checks for MPI libraries.
+	LDFLAGS_OLD="$LDFLAGS"
+	LDFLAGS="$LDFLAGS $libmpi_search_path"
+	AC_CHECK_LIB(mpich, MPI_Init, ,
+		echo "configure: libmpich.a not found! WARNING: \"Must specify correct path to MPI install with --with-mpi\"" 2>&1;)
+	LD_FLAGS="$LDFLAGS_OLD"
+
+
+dnl
+dnl Enables the kernel module to build if the appropriate
+dnl linux-2.4.x path is specified
+dnl Make sure this is a usable kernel source tree too.
+dnl
+AC_ARG_WITH(kernel,
+[  --with-kernel=src_path  Build capfs kernel module against 2.4.x src],
+    if test x$withval = xyes -o x$withval = x ; then
+    	AC_MSG_ERROR(--with-kernel must be given the path to your kernel 2.4.x source.)
+    fi
+    if ! test -d $withval ; then
+    	AC_MSG_ERROR(The --with-kernel path $withval is not a directory.)
+    fi
+    if ! test -r $withval/include/linux/version.h ; then
+	AC_MSG_ERROR(The kernel source tree must have been configured.)
+    fi
+    vers=`sed -n '/UTS_RELEASE/{; s/.*"\([0-9]\.[0-9]\).*".*/\1/; p; }' $withval/include/linux/version.h`
+    if ! grep -q UTS_RELEASE..2\\.4\\. $withval/include/linux/version.h ; then
+	AC_MSG_ERROR(The kernel source tree does not appear to be 2.4)
+    fi
+    LINUX_KERNEL_SRC="$withval"
+    , LINUX_KERNEL_SRC="")
+
+AC_SUBST(LINUX_KERNEL_SRC)
+export LINUX_KERNEL_SRC
+
+BUILD_ABSOLUTE_TOP=`pwd`
+SRC_RELATIVE_TOP=$srcdir
+SRC_ABSOLUTE_TOP=`cd $srcdir ; pwd`
+
+AC_SUBST(LINUX_KERNEL_SRC)
+AC_SUBST(BUILD_ABSOLUTE_TOP)
+AC_SUBST(SRC_RELATIVE_TOP)
+AC_SUBST(SRC_ABSOLUTE_TOP)
+
+dnl
+dnl Enables the kernel module to build if the appropriate
+dnl linux-2.6.x path is specified
+dnl Make sure this is a usable kernel source tree too and user has write permissions
+dnl
+AC_ARG_WITH(kernel26,
+[  --with-kernel26=src_path  Build capfs kernel module against 2.6.x src],
+    if test x$withval = xyes -o x$withval = x ; then
+    	AC_MSG_ERROR(--with-kernel26 must be given the path to your kernel 2.6.x source.)
+    fi
+    if ! test -d $withval ; then
+    	AC_MSG_ERROR(The --with-kernel26 path $withval is not a directory.)
+    fi
+    if ! test -r $withval/include/linux/version.h ; then
+	AC_MSG_ERROR(The kernel source tree must have been configured.)
+    fi
+    vers=`sed -n '/UTS_RELEASE/{; s/.*"\([0-9]\.[0-9]\).*".*/\1/; p; }' $withval/include/linux/version.h`
+    if ! grep -q UTS_RELEASE..2\\.6\\. $withval/include/linux/version.h ; then
+	AC_MSG_ERROR(The kernel source tree does not appear to be 2.6)
+    fi
+    LINUX26_KERNEL_SRC="$withval"
+    , LINUX26_KERNEL_SRC="")
+
+AC_SUBST(LINUX26_KERNEL_SRC)
+export LINUX26_KERNEL_SRC
+
+AC_SUBST(LINUX26_KERNEL_SRC)
+
+AC_ARG_ENABLE(strict,
+[  --enable-strict         Turn on strict debugging with gcc],
+CFLAGS="$CFLAGS -Wall -O2 -Wstrict-prototypes -Wmissing-prototypes -Wundef -Wpointer-arith -Wbad-function-cast")
+
+dnl Check if user actually wants to see all our build output (compiles, links, etc.).
+AC_ARG_ENABLE(verbose-build,
+[  --enable-verbose-build  Enables full output during build process],
+QUIET_COMPILE=0,
+QUIET_COMPILE=1)
+
+AC_SUBST(QUIET_COMPILE)
+
+AC_CHECK_PROG(HAVE_PKGCONFIG, pkg-config, yes, no)
+if test x$HAVE_PKGCONFIG = xyes ; then
+	AC_MSG_CHECKING([for openssl])
+	if `pkg-config --exists openssl` ; then
+		if `pkg-config --atleast-version=0.9.6j openssl` ; then
+			AC_MSG_RESULT(yes)
+			SSLLIBS=`pkg-config --libs openssl`
+			SSLCFLAGS=`pkg-config --cflags openssl`
+
+			AC_SUBST(SSLLIBS)
+			AC_SUBST(SSLCFLAGS)
+		else
+			echo  "Either upgrade the openssl package or point the PKG_CONFIG_PATH to the directory containing openssl.pc before configuring this tool"
+			AC_MSG_ERROR(capfs requires that openssl package version is >= 0.9.6j!) 
+		fi
+	else
+		echo "Perhaps, PKG_CONFIG_PATH must be set to the directory containing openssl.pc"
+		AC_MSG_ERROR(pkg-config could not find openssl package!)
+	fi
+else
+	AC_MSG_ERROR(Could not find pkg-config)
+fi
+
+dnl Check for utilities that we need during the build process
+AC_PROG_INSTALL
+AC_PROG_CC
+AC_PROG_CPP
+AC_CHECK_PROG(HAVE_RPCGEN, rpcgen, yes, no)
+if test x$HAVE_RPCGEN = xno ; then
+	AC_MSG_ERROR(Could not find rpcgen. Upgrading to a more recent version of glibc should help!)
+fi
+
+dnl See if CC is a GNU compiler.  This may require a real test in future
+dnl versions of autoconf.  In 2.13 it is a side-effect of AC_PROG_CC.  First
+dnl check if it is an Intel compiler; those lie and claim to be gcc but are
+dnl not argument compatible
+INTELC=
+GNUC=
+AC_MSG_CHECKING(whether cc is an Intel compiler)
+AC_TRY_COMPILE([
+#ifndef __ICC
+       choke me
+#endif
+], [],
+    AC_MSG_RESULT(yes)
+    INTELC=1
+    ,
+    AC_MSG_RESULT(no)
+)
+if test x$INTELC = x ; then
+    if test x$GCC = xyes ; then
+	GNUC=1
+    fi
+fi
+AC_SUBST(INTELC)
+AC_SUBST(GNUC)
+
+dnl check for getmntent(), special test
+AC_FUNC_GETMNTENT
+
+dnl if we use headers that might not be on every platform, add them here
+AC_CHECK_HEADERS(malloc.h)
+AC_CHECK_HEADERS(mntent.h)
+AC_CHECK_HEADERS(netdb.h)
+AC_CHECK_HEADERS(arpa/inet.h)
+AC_CHECK_HEADERS(netinet/in.h)
+AC_CHECK_HEADERS(rpc/rpc.h)
+AC_CHECK_HEADERS(rpc/svc.h)
+AC_CHECK_HEADERS(rpc/clnt.h)
+AC_CHECK_HEADERS(rpc/pmap_clnt.h)
+AC_CHECK_HEADERS(rpc/xdr.h)
+AC_CHECK_HEADERS(openssl/evp.h)
+AC_CHECK_HEADERS(openssl/crypto.h)
+AC_CHECK_HEADERS(linux/unistd.h)
+AC_CHECK_HEADERS(errno.h)
+AC_CHECK_HEADERS(pthread.h)
+
+dnl check for gethostbyname function
+AC_MSG_CHECKING(for gethostbyname)
+AC_TRY_COMPILE([
+#include <netdb.h>
+], [
+gethostbyname("localhost");
+],
+AC_MSG_RESULT(yes)
+AC_DEFINE(HAVE_GETHOSTBYNAME, 1, Define if gethostbyname function exists),
+AC_MSG_RESULT(no)
+WARN_ABOUT_HOSTNAMES="yes")
+
+dnl redhat's 2.4.20-20.9 kernel makes changes to the scheduler structures
+dnl this breaks capfs, so let's try to first catch it, then work around it
+dnl
+dnl specifically they've changed the signal handling structues.
+dnl
+CFLAGS_OLD="$CFLAGS"
+if test x$LINUX_KERNEL_SRC != "x" ; then
+	CFLAGS="$CFLAGS -I $LINUX_KERNEL_SRC/include"
+	AC_MSG_CHECKING(for sighand member of task_struct)
+	AC_TRY_COMPILE([
+		#define __KERNEL__
+		#include <linux/sched.h>
+		], [
+		spin_lock_irq(&current->sighand->siglock);
+		], AC_MSG_RESULT(yes)
+		AC_DEFINE(HAVE_SIGHAND_IN_TASK_STRUCT, 
+			1, Define if task_struct has sighand member (rather than sigmask member)),
+		AC_MSG_RESULT(no) 
+	)
+fi
+CFLAGS="$CFLAGS_OLD"
+
+AC_OUTPUT(Makefile
+module.mk
+client/module.mk
+client/plugins/module.mk
+cmgr/module.mk
+data-server/module.mk
+meta-server/module.mk
+meta-server/meta/module.mk
+lib/module.mk
+libcas/module.mk
+shared/module.mk
+tpool/module.mk
+utils/module.mk
+vfs/Makefile
+vfs26/Makefile
+fsck/Makefile
+test/Makefile
+test/performance/Makefile
+test/simple_hserver/chunk/Makefile
+test/simple_hserver/Makefile
+test/hserver-with-callbacks/Makefile
+test/race/Makefile
+)
+
+# dump LIBS variable into a file to be used by test/configure
+AC_OUTPUT_COMMANDS([echo ${LIBS}> .libs])
+
+# print a summary of the configuration information
+AC_MSG_RESULT()
+AC_MSG_RESULT([***** Displaying CAPFS Configuration Information ******])
+AC_MSG_RESULT([------------------------------------------------------])
+
+if test "x$LINUX_KERNEL_SRC" = "x" ; then
+	AC_MSG_RESULT([CAPFS VFS module configured for the 2.4 kernel  : no])
+else
+	AC_MSG_RESULT([CAPFS VFS module configured for the $LINUX_KERNEL_SRC kernel ])
+fi
+if test "x$LINUX26_KERNEL_SRC" = "x" ; then
+	AC_MSG_RESULT([CAPFS VFS module configured for the 2.6 kernel  : no])
+else
+	AC_MSG_RESULT([CAPFS VFS module configured for the $LINUX26_KERNEL_SRC kernel])
+fi
+if test "x$WARN_ABOUT_HOSTNAMES" = "xyes" ; then
+   AC_MSG_RESULT(WARNING: gethostbyname is not supported on this machine: ALL ADDRESSES MUST BE IN DOT NOTATION.)
+fi
+AC_MSG_RESULT()
+AC_MSG_RESULT([CAPFS version string: $CAPFS_VERSION])
+
+AC_MSG_RESULT()

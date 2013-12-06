@@ -1,0 +1,19 @@
+DIR := meta-server/
+
+LIBSRC += \
+			 $(DIR)/mgr_prot_common.c $(DIR)/mgr_prot_client.c \
+			 $(DIR)/mgr_prot_clnt.c $(DIR)/mgr_prot_xdr.c
+
+MGRSRC += \
+			$(DIR)/mgr_compat.c $(DIR)/mgr_prot_aux_svc.c $(DIR)/flist.c $(DIR)/fslist.c $(DIR)/iodtab.c \
+			$(DIR)/filter-dirents.c $(DIR)/mgr_prot_common.c $(DIR)/mgr_callback.c $(DIR)/mgr_prot_server.c\
+			$(DIR)/mgr_prot_svc.c $(DIR)/mgr_prot_xdr.c $(DIR)/mgr_cbid.c
+
+MODCFLAGS_$(DIR)/mgr_compat.c = -I $(srcdir)/meta-server/meta 
+MODCFLAGS_$(DIR)/mgr_prot_xdr.c = -Wno-unused
+MODCFLAGS_$(DIR)/mgr_callback.c = $(ARCH_CFLAGS)
+
+GENSRCS := \
+		$(DIR)/mgr_prot_clnt.c $(DIR)/mgr_prot_xdr.c $(DIR)/mgr_prot.h $(DIR)/mgr_prot_svc.c
+
+.SECONDARY: $(GENSRCS)

@@ -1,0 +1,46 @@
+CC=@CC@
+LD=@CC@
+CFLAGS=@CFLAGS@
+CFLAGS+=-I. -I ../../shared -I ../../tpool/include -I ../../lib/
+CFLAGS+=-D_GNU_SOURCE
+CFLAGS+=-MMD -g -Wall -Wstrict-prototypes -pipe -O2
+LFLAGS=-L ../../libs -lcapfs @SSLLIBS@ -lnsl -lpthread
+
+CLNTSRC=client.c
+CLNTOBJ=$(CLNTSRC:.c=.o)
+CLNTDEPS=$(CLNTSRC:.c=.d)
+SRVSRC=server.c
+SRVOBJ=$(SRVSRC:.c=.o)
+SRVDEPS=$(SRVSRC:.c=.d)
+
+all: client server chunk-subdir
+
+client: $(CLNTOBJ) 
+	$(LD) $< -o $@ $(LFLAGS)
+
+server: $(SRVOBJ)
+	$(LD) $< -o $@ $(LFLAGS)
+
+chunk-subdir:
+	$(MAKE) -C chunk
+
+$(CLNTOBJ): %.o: %.c
+	$(CC) $(CFLAGS) -c $< -o $@
+	
+$(SRVOBJ): %.o: %.c
+	$(CC) $(CFLAGS) -c $< -o $@
+
+$(CLNTDEPS): %.d:%.c
+	@touch $@
+
+$(SRVDEPS): %.d:%.c
+	@touch $@
+
+clean: chunk-clean
+	@rm -f $(CLNTOBJ) $(SRVOBJ) $(CLNTDEPS) $(SRVDEPS) client server
+
+chunk-clean:
+	$(MAKE) -C chunk clean
+	
+-include $(CLNTDEPS)
+-include $(SRVDEPS)

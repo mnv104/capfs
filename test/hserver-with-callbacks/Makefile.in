@@ -1,0 +1,46 @@
+CLIENT = lock_client
+SERVER = lock_server
+
+SOURCES_CLNT.c = 
+SOURCES_CLNT.h = 
+SOURCES_SVC.c = 
+SOURCES_SVC.h = 
+SOURCES.x = lock.x
+
+TARGETS_SVC.c = lock_svc.c lock_server.c lock_xdr.c 
+TARGETS_CLNT.c = lock_clnt.c client.c lock_xdr.c 
+TARGETS = lock.h lock_xdr.c lock_clnt.c lock_svc.c lock_client.c lock_server.c
+
+OBJECTS_CLNT = $(SOURCES_CLNT.c:%.c=%.o) $(TARGETS_CLNT.c:%.c=%.o)
+OBJECTS_SVC = $(SOURCES_SVC.c:%.c=%.o) $(TARGETS_SVC.c:%.c=%.o)
+# Compiler flags 
+
+CC = @MPI_BINARY_PATH@/mpicc
+CPPFLAGS += -D_REENTRANT -D_GNU_SOURCE
+CFLAGS += -g -I ../../shared -I ../..//cmgr/ -I @MPI_HEADER_PATH@
+LDLIBS += -L ../../libs -lcapfs @SSLLIBS@ -lnsl -lpthread 
+RPCGENFLAGS = -N -C -M
+
+# Targets 
+
+all : $(CLIENT) $(SERVER)
+
+$(TARGETS) : $(SOURCES.x) 
+	rpcgen $(RPCGENFLAGS) $(SOURCES.x)
+
+$(OBJECTS_CLNT) : $(SOURCES_CLNT.c) $(SOURCES_CLNT.h) $(TARGETS_CLNT.c) 
+
+$(OBJECTS_SVC) : $(SOURCES_SVC.c) $(SOURCES_SVC.h) $(TARGETS_SVC.c) 
+
+$(CLIENT) : $(OBJECTS_CLNT) 
+	$(LINK.c) -o $(CLIENT) $(OBJECTS_CLNT) $(LDLIBS) 
+
+$(SERVER) : $(OBJECTS_SVC) 
+	$(LINK.c) -o $(SERVER) $(OBJECTS_SVC) $(LDLIBS)
+
+%.o: %.c
+	$(CC) $(CFLAGS) $(CPPFLAGS) -c $< -o $@
+
+clean:
+	 $(RM) core $(OBJECTS_CLNT) $(OBJECTS_SVC) $(CLIENT) $(SERVER)
+

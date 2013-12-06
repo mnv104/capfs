@@ -1,0 +1,106 @@
+# 
+# Special Makefile for building kernel module.  Invoked both by user and
+# by kernel build process.
+#
+here = vfs/
+top  = ../
+absolute_src_dir = @SRC_ABSOLUTE_TOP@
+src_relative_top = @SRC_RELATIVE_TOP@
+
+ifeq "/" "$(shell echo ${src_relative_top} | cut -c 1)"
+# not actually relative (as if someone called /tmp/foo/configure
+#    instead of ../foo/configure)
+    relative_src_dir = ${src_relative_top}
+else
+    relative_src_dir = $(top)/${src_relative_top}
+endif
+
+QUIET_COMPILE = @QUIET_COMPILE@
+ifdef V
+    QUIET_COMPILE = 0
+endif
+
+ifeq ($(QUIET_COMPILE),1)
+  # say a one-line description of the action, do not echo the command
+  Q=@echo
+  E=@
+else
+  # do not say the short Q lines, but do echo the entire command
+  Q=@echo >/dev/null
+  E=
+endif
+
+TARGET = capfs.o
+KERNEL_SOURCES=capfs_mod.c file.c dir.c inode.c ll_capfs.c symlink.c \
+capfs_bufmap.c capfs_sysctl.c krwsemaphore-spinlock.c capfsdev.c
+KERNEL_OBJECTS = $(KERNEL_SOURCES:.c=.o)
+KERNEL_DEPENDANCIES = $(KERNEL_SOURCES:.c=.d)
+KERNEL_PREPROC = $(KERNEL_SOURCES:.c=.i)
+KERNEL_ASSEMBLED = $(KERNEL_SOURCES:.c=.s)
+CAPFS_ARCH_FLAGS = @CAPFS_ARCH_CFLAGS@
+KDIR = @LINUX_KERNEL_SRC@
+DEFAULT_KDIR := /lib/modules/$(shell uname -r)/build/
+HPATH = $(KDIR)/include/
+DEFAULT_HPATH = $(DEFAULT_KDIR)/include
+
+LD=gcc 
+CC=gcc
+MODLD=ld
+
+# Add appropriate flags for compilation  
+EXTRA_CFLAGS = \
+	-I$(absolute_src_dir)/ \
+	-I$(absolute_src_dir)/lib \
+	-I$(here)
+
+CPPFLAGS = -DLINUX -DMODULE -D__KERNEL__ -I$(HPATH) $(EXTRA_CFLAGS) -I$(DEFAULT_HPATH)
+CFLAGS=$(CPPFLAGS) -MMD \
+	 -O2 -Wall -Wno-trigraphs\
+	-Wstrict-prototypes \
+	-pipe -fomit-frame-pointer -fno-strict-aliasing -fno-common\
+	-DCAPFS_SERIALIZE_DCACHE $(CAPFS_ARCH_CFLAGS)
+
+ifneq (,$(KDIR))
+	CFLAGS += -include $(HPATH)/linux/rhconfig.h
+else
+	CFLAGS += -include $(DEFAULT_HPATH)/linux/rhconfig.h
+endif
+
+# Older 2.4 kernels barf at including arch/i386/Makefile
+# All we want is the set of architecture specific flags
+# What we are going to do is hardcode that at configure time 
+# itself.
+#
+#ARCH := $(shell uname -m | sed -e s/i.86/i386/ -e s/sun4u/sparc64/ -e s/arm.*/arm/ -e s/sa110/arm/)
+#dummy: all
+#ifneq(,$(KDIR))
+#include $(KDIR)/arch/$(ARCH)/Makefile
+#else
+#include $(DEFAULT_KDIR)/arch/$(ARCH)/Makefile
+#endif
+
+.PHONY: all clean distclean 
+
+all:$(TARGET) 
+
+capfs.o: $(KERNEL_OBJECTS)
+	$(Q) "  LD [M]  $(absolute_src_dir)/$(here)/$@"
+	$(E)$(MODLD) -r -o $@ $^ 
+
+$(KERNEL_OBJECTS): %.o: %.c
+	$(Q) "  CC [M]  $(absolute_src_dir)/$(here)/$@"
+	$(E)$(CC) $(CFLAGS) -c $< -o $@
+
+#%.d: %.c
+#	$(E)touch $@
+
+$(KERNEL_PREPROC): %.i: %.c
+	$(E)$(CC) $(CFLAGS) -E $< -o $@
+
+$(KERNEL_ASSEMBLED): %.s: %.c
+	$(E)$(CC) $(CFLAGS) -S $< -o $@
+
+clean:
+	-rm -f *.o config.cache *.d *~
+
+-include $(KERNEL_DEPENDANCIES)

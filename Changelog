@@ -1,0 +1,90 @@
+Summary of versions and what has been accomplished yet...
+
+rel-0-1: Basic infrastructure is ready. Most of the library-based utilities
+work fine. VFS infrastructure is still being worked upon. Fixed some
+weird threading related issues with the server side TCP based RPC
+code. Finally determined that UDP/RPC with thread pools works fine,
+but TCP/RPC needs a single threaded service.
+
+
+rel-0-2: Finally, the VFS infrastructure is also ready and working great.
+Symlinks seemed to crash the kernel module for some reason. Need to investigate 
+this a bit more. But basically, this should serve as the testing base against
+which we need to compare the content-addressable scheme.
+
+rel-0-3: Ok, this is a bug-fix over the previous release that just fixes
+the symlink problem. Detailed message is in the CVS history log.
+
+rel-pre[23]-freenix: This is the version that is fairly functional and usable.
+Most I/O and meta-data operations seem to complete without any hiccups.
+(Or so I think ;)). Checkpointed it as the snapshot at the time of the Freenix
+paper submission. Fixes a lot of memory copying violations. No attempt
+has been made to improve the performance and the emphasis has been on correctness.
+
+rel-0-4: Fixed all the bugs (hopefully) after migration to an RPC-based CAS server 
+interface. Hurray, I can now mount a CAPFS volume from my Linux/PPC powerbook
+when the data is actually stored on a x86-based machine, Seems to work pretty good
+on a limited set of tests.
+
+rel-0-4-1: Complete revamp of the build system with automagical tracking of dependance
+across sub-directories etc. All namespace related functions are now prefixed
+with a capfs_ instead of a pvfs_. A new configure system is also in place to
+take care of platform-specific quirks. Hopefully, this should be the base
+against which jason can start working on his GC code.
+
+rel-0-4-2: More fixes for the message printing subsystem to use the LOG
+macros, more beautified Makefile.in fixes for non-verbose builds. More
+information can be found from the cvs commit logs. Incremental release fix.
+
+rel-0-4-3: Cleanups in the libcas directory to get things to work despite not
+setting instrumentation flag and other bugs. Build system fixes to get test
+and fsck subdirectory under the purvey. A new configure option to pass in
+thelocation of the MPI libraries and header files.
+
+rel-0-4-4: More cleanups in the build process and fixed a few errors and typos
+in the process. 
+
+rel-0-4-5: Added plugin support at the client daemon, and support for retrying
+of failed commits.
+
+rel-0-4-6: NEW release containing the kernel driver for 2.6.x based kernel. Needs extensive testing
+though. Basic functionality was only tested in this release.
+
+rel-0-4-6-3: Minor release that contains a few bugfixes like the 2.4 redhat
+kernel workaround, 2.4 kernel makefile fixes, open RPC to honor the 
+fetch_hashes flags, and the number of hashes fetched at
+open/gethashes/wcommit.
+
+rel-0-5: Major release that contains tons of bugfixes, features. Most
+important are vfs2.6 port merge, hcache coherence bug fixes, automatic retries
+of callback registration upon manager restart, CLIENT handle caching policy
+fixes, hcache update-based callbacks and resorting to that when sharer set is
+size 2, truncate bug fixes, /proc/sys/capfs displays statistics on
+hcache/performance related statistics.
+
+rel-0-5-1: Minor release that should contain preliminary plugin infrastructures, performance
+related fixes for reads, bumped up I/O transfer sizes, few other minor bug fixes that are described
+in the cvs ci log.
+
+rel-0-6: Quite a few bug fixes are present in this release. But most importantly it alsocomes
+with a whole lot of performance statistics and tunables. This is also
+incidentally the last RPC based server release for the cas server side since
+that really sucks on performance.
+
+rel-0-7: This is the first release that re-introduces the socket-based CAS server implementation
+that was thrown out in favor of the RPC based implementation. It turns out that we need this to gain back our
+performance loss. This has all the fixes for NO_DELAY etc but does not cache the socket fds to the
+IOD servers.
+
+rel-0-8: This is the first release that introduces a select-based implementation of the CAS
+server and client-sockfd caching.
+
+rel-0-8-1: Minor bugfix release + assorted code cleanups and print statements. Version with which
+the socket-based , cached sockfd code results are being obtained.
+
+rel-0-9-0: Major release that fixes the performance related problems with the hcache, a few critical
+bug fixes affecting the Myrinet cases. Lets wait and hope that this will really help us with our
+bandwidth problems :)
+
+
+

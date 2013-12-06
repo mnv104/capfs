@@ -1,0 +1,23 @@
+
+DIR := lib/
+
+LIBSRC += \
+	$(DIR)/capfs_chmod.c $(DIR)/capfs_chown.c $(DIR)/capfs_open.c $(DIR)/capfs_ostat.c \
+	$(DIR)/capfs_close.c $(DIR)/capfs_unlink.c $(DIR)/alist.c $(DIR)/capfs_read_list.c \
+	$(DIR)/capfs_write_list.c $(DIR)/capfs_read.c $(DIR)/capfs_write.c $(DIR)/capfs_fstat.c \
+	$(DIR)/capfs_lseek.c $(DIR)/prune.c $(DIR)/capfs_rename.c $(DIR)/capfs_ioctl.c \
+	$(DIR)/capfs_exit.c $(DIR)/capfs_mkdir.c $(DIR)/capfs_fcntl.c $(DIR)/capfs_rmdir.c \
+	$(DIR)/capfs_fchown.c $(DIR)/capfs_fchmod.c $(DIR)/capfs_dup.c $(DIR)/capfs_dup2.c \
+	$(DIR)/capfs_lstat.c $(DIR)/jlist.c $(DIR)/capfs_access.c $(DIR)/mgrcomm.c $(DIR)/capfs_mmap.c \
+	$(DIR)/capfs_ftruncate.c $(DIR)/capfs_flock.c $(DIR)/capfs_fdatasync.c $(DIR)/capfs_fsync.c \
+	$(DIR)/capfs_readv.c $(DIR)/capfs_writev.c $(DIR)/capfs_truncate.c $(DIR)/capfs_utime.c \
+	$(DIR)/capfs_statfs.c $(DIR)/capfs_getdents.c $(DIR)/capfs_ftruncate64.c $(DIR)/capfs_truncate64.c \
+	$(DIR)/capfs_lseek64.c $(DIR)/parse_fstab.c $(DIR)/capfs_detect.c $(DIR)/capfs_symlink.c \
+	$(DIR)/build_job_single_connection.c $(DIR)/iodcomm.c $(DIR)/build_list_job_single_connection.c \
+	$(DIR)/do_job_single_connection.c $(DIR)/capfs_gethashes.c
+
+# Most distros seem to have a problem in user-space including both sys/statfs.h and linux/fs.h
+MODCFLAGS_$(DIR) = -D_LINUX_FS_H -D_LINUX_VFS_H -D_LINUX_WAIT_H
+
+
+

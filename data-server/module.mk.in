@@ -1,0 +1,19 @@
+DIR := data-server/
+
+LIBSRC += \
+			 $(DIR)/iod_prot_client.c \
+			 $(DIR)/iod_prot_clnt.c $(DIR)/iod_prot_xdr.c 
+
+IODSRC += \
+			$(DIR)/capfs_iod.c $(DIR)/iod_config.c $(DIR)/iod_prot_server.c \
+			$(DIR)/iod_prot_svc.c $(DIR)/iod_prot_xdr.c
+
+MODCFLAGS_$(DIR)/iod_prot_xdr.c = -Wno-unused
+MODCFLAGS_$(DIR)/capfs_iod.c = -D_POSIX_C_SOURCE=200112
+MODCFLAGS_$(DIR)/iod_prot_server.c = -D_POSIX_C_SOURCE=200112
+MODCFLAGS_$(DIR)/iod_prot_client.c = -D_POSIX_C_SOURCE=200112
+
+GENSRCS := \
+		$(DIR)/iod_prot_clnt.c $(DIR)/iod_prot_xdr.c $(DIR)/iod_prot.h $(DIR)/iod_prot_svc.c
+
+.SECONDARY: $(GENSRCS)

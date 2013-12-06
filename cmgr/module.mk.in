@@ -1,0 +1,8 @@
+
+DIR := cmgr/
+
+LIBSRC += \
+			 $(DIR)/block.c  $(DIR)/cmgr.c  $(DIR)/dcache.c  $(DIR)/file.c  $(DIR)/gen-locks.c  $(DIR)/hcache.c $(DIR)/rbtree.c
+
+MODCFLAGS_$(DIR) = -D_XOPEN_SOURCE=500 
+

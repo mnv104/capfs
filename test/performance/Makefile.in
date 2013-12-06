@@ -1,0 +1,34 @@
+CC=@CC@
+LD=@CC@
+CFLAGS=@CFLAGS@
+CFLAGS+=-D_GNU_SOURCE -D_REENTRANT
+CFLAGS+=-g -Wall -MMD -pipe -O2 -Wstrict-prototypes -Wno-unused
+CFLAGS+=-I ../../lib -I ../../libcas -I ../../tpool/include
+LFLAGS=-L ../../libs -lcapfs @SSLLIBS@ -lnsl -lpthread
+
+all: mkchunk.o test_mkchunk test_xput_client test_xget_client 
+
+mkchunk.o: mkchunk.c
+	$(CC) $< $(CFLAGS) -c -o $@
+
+test_mkchunk: test_mkchunk.o mkchunk.o
+	$(LD) test_mkchunk.o mkchunk.o -o $@ $(LFLAGS)
+
+test_mkchunk.o: test_mkchunk.c
+	$(CC) $< $(CFLAGS) -c -o $@
+
+test_xput_client.o: test_xput_client.c
+	$(CC) $< $(CFLAGS) -c -o $@
+
+test_xput_client: test_xput_client.o
+	$(LD) $< -o $@ $(LFLAGS)
+
+test_xget_client.o: test_xget_client.c
+	$(CC) $< $(CFLAGS) -c -o $@
+
+test_xget_client: test_xget_client.o
+	$(LD) $< -o $@ $(LFLAGS)
+
+clean:
+	rm -f *.o test_mkchunk test_xput_client test_xget_client mkchunk *.d *~
+	

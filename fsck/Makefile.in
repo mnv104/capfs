@@ -1,0 +1,60 @@
+# Copyright(C) 2004
+#  -Murali Vilayannur
+
+srcdir=.
+prefix=/usr/local
+exec_prefix=${prefix}
+CAPFS_LIB_PATH=-L ../libs/
+CAPFS_HEADER_PATH=-I . -I ../lib/ -I ../shared/
+MPI_LIBRARY_SEARCH_PATH=@MPI_LIBRARY_SEARCH_PATH@
+MPI_HEADER_PATH=@MPI_HEADER_PATH@
+
+SOURCES= capfs_encode.c capfs.fsck.c capfs_misc.c capfs_parse.c capfs_path.c
+TARGET = capfs.fsck
+
+OBJECTS = $(SOURCES:.c=.o)
+DEPENDANCIES = $(SOURCES:.c=.d)
+PREPROC = $(SOURCES:.c=.i)
+ASSEMBLED = $(SOURCES:.c=.s)
+
+.PHONY: all clean distclean install
+
+INSTALL=install -c
+
+INCLUDES=-I. 
+CFLAGS=@CFLAGS@
+CFLAGS+=-D_GNU_SOURCE -DLINUX -DBITS_PER_LONG=32 -DBYTES_PER_LONG=4 
+CFLAGS+=-Wall -Winline -g -O2 -pipe -MMD -Wno-unused
+CFLAGS+=$(CAPFS_HEADER_PATH) $(INCLUDES) $(MPI_HEADER_PATH) -g -O2
+
+LD=@CC@ 
+CC=@CC@
+
+all:$(TARGET) 
+
+# Are all MPI vendor libraries by name libmpich.a? I don't know. :(
+$(TARGET): $(OBJECTS)
+	$(LD) -o $@ $^ $(MPI_LIBRARY_SEARCH_PATH) -lmpich $(CAPFS_LIB_PATH) -lcapfs @SSLLIBS@ -lpthread -lnsl
+
+$(DEPENDANCIES): %.d: %.c
+	@touch $@
+
+$(PREPROC): %.i: %.c
+	$(CC) $(CFLAGS) -E $< -o $@
+
+$(ASSEMBLED): %.s: %.c
+	$(CC) $(CFLAGS) -S $< -o $@
+	
+$(OBJECTS): %.o: %.c
+	$(CC) $(CFLAGS) -c $< -o $@
+
+cscope.out: $(SOURCES)
+	@cscope -Rb
+
+clean:
+	-rm -f $(DEPENDANCIES) $(OBJECTS) $(TARGET) $(PREPROC) $(ASSEMBLED) *~ machinefile cscope.out
+
+distclean: clean
+	-rm -f Makefile config.cache config.log config.status config.h 
+
+-include $(DEPENDANCIES)

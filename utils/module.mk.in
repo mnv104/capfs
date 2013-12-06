@@ -1,0 +1,14 @@
+DIR := utils/
+
+UTILSSRC += \
+	$(DIR)/capfs-chown.c $(DIR)/capfs-iod-ping.c $(DIR)/capfs-link.c $(DIR)/capfs-ls.c \
+	$(DIR)/capfs-lstat.c $(DIR)/capfs-mgr-ping.c $(DIR)/capfs-mkdir.c $(DIR)/capfs-mkfile.c \
+	$(DIR)/capfs-ping.c $(DIR)/capfs-readlink.c $(DIR)/capfs-rmdir.c $(DIR)/capfs-size.c \
+	$(DIR)/capfs-stat64.c $(DIR)/capfs-stat.c $(DIR)/capfs-statfs.c $(DIR)/capfs-test.c \
+	$(DIR)/capfs-testdist.c $(DIR)/capfs-testrandom.c $(DIR)/capfs-truncate.c $(DIR)/capfs-unlink.c \
+	$(DIR)/capfs-utime.c $(DIR)/capstat.c \
+	$(DIR)/ping.c $(DIR)/u2p.c $(DIR)/capfs-clean.c $(DIR)/capfs-quickdump.c $(DIR)/capfs-gethashes.c
+
+MODCFLAGS_$(DIR)/capfs-ping.c = -D_LINUX_FS_H -D_LINUX_VFS_H -D_LINUX_WAIT_H
+MODCFLAGS_$(DIR)/capfs-clean.c = -D_LINUX_FS_H -D_LINUX_VFS_H -D_LINUX_WAIT_H
+

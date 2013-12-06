@@ -1,0 +1,92 @@
+CC=@CC@
+LD=@CC@
+MPICC=@MPI_BINARY_PATH@/mpicc
+CFLAGS= @CFLAGS@
+CFLAGS+=-D_GNU_SOURCE 
+CFLAGS+=-I ../ -I ../shared/ -I ../cmgr -I ../tpool/include -I ../lib -I ../libcas 
+CFLAGS+=-MMD -g -Wall -Wstrict-prototypes -pipe -O2
+MPICFLAGS=-I @MPI_HEADER_PATH@ -g
+LFLAGS=-L ../libs -lcapfs @SSLLIBS@ -lnsl -lpthread
+
+SRCS=hash_stress_test.c test_dcache.c test_hcache.c test-rpcutils.c test_sha1.c seek_test.c racer.c truncate_test.c test_writes.c
+MPISRCS=test_writes_mpi.c write_test.c
+
+OBJS=$(SRCS:.c=.o)
+DEPS=$(SRCS:.c=.d)
+PRE =$(SRCS:.c=.i)
+ASS =$(SRCS:.c=.s)
+
+MPIOBJS=$(MPISRCS:.c=.o)
+MPIDEPS=$(MPISRCS:.c=.d)
+MPIPRE =$(MPISRCS:.c=.i)
+MPIASS =$(MPISRCS:.c=.s)
+
+SUBDIRS= hserver-with-callbacks performance race simple_hserver
+
+.PHONY: all clean subdir
+
+all: hash_stress_test test_dcache test_hcache test-rpcutils test_sha1 seek_test racer truncate_test test_writes subdir test_writes_mpi write_test
+
+subdir::
+	set -e; for d in $(SUBDIRS); do $(MAKE) -C $$d ; done
+
+hash_stress_test: hash_stress_test.o
+	$(LD) $^ -o $@ $(LFLAGS)
+
+test_dcache: test_dcache.o
+	$(LD) $^ -o $@ $(LFLAGS)
+
+test_hcache: test_hcache.o
+	$(LD) $^ -o $@ $(LFLAGS)
+
+test-rpcutils: test-rpcutils.o
+	$(LD) $^ -o $@ $(LFLAGS)
+
+test_sha1: test_sha1.o
+	$(LD) $^ -o $@ $(LFLAGS)
+
+seek_test: seek_test.o
+	$(LD) $^ -o $@ 
+
+truncate_test: truncate_test.o
+	$(LD) $^ -o $@ 
+
+test_writes: test_writes.o
+	$(LD) $^ -o $@ 
+
+test_writes_mpi: test_writes_mpi.o
+	$(MPICC) $^ -o $@
+
+write_test: write_test.o
+	$(MPICC) $^ -o $@
+
+racer: racer.o
+	$(LD) $^ -o $@ -lpthread
+
+$(OBJS): %.o: %.c
+	$(CC) $(CFLAGS) -c $< -o $@
+
+$(PRE): %.i: %.c
+	$(CC) $(CFLAGS) -E $< -o $@
+
+$(ASS): %.s: %.c
+	$(CC) $(CFLAGS) -S $< -o $@
+
+$(MPIOBJS): %.o: %.c
+	$(MPICC) $(MPICFLAGS) -c $< -o $@
+
+$(MPIPRE): %.i: %.c
+	$(MPICC) $(MPICFLAGS) -E $< -o $@
+
+$(MPIASS): %.s: %.c
+	$(MPICC) $(MPICFLAGS) -S $< -o $@
+
+clean: subdir-clean
+	rm -f *.o *.d hash_stress_test test_sha1 test_dcache test_hcache test-rpcutils seek_test racer *.s *~ truncate_test test_writes test_writes_mpi write_test
+
+subdir-clean::
+	set -e; for d in $(SUBDIRS); do $(MAKE) -C $$d clean; done
+
+-include $(DEPS)
+-include $(MPIDEPS)
+

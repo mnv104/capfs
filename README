@@ -1,0 +1,80 @@
+ ------- Design of CAPFS ---------
+
+The design choices and implementation
+of a sequentially consistent parallel file system
+is explained in greater detail in the following paper:
+
+"CAPFS: On the Design of a Lockless Sequentially Consistent Parallel File System".
+
+that should be available on my website
+
+http://www.cse.psu.edu/~vilayann/
+
+For any questions/comments/bugs/suggestions/(even criticisms!)
+about this package, please send email to
+
+Murali Vilayannur (vilayann@cse.psu.edu)
+Partho Nath       (nath@cse.psu.edu)
+
+For ease of use, convenience, the servers have been designed to accomodate
+a "pure" PVFS request protocol, which means that we can also operate this piece
+of code as you would use PVFS.
+Basically, the meta-data server is an RPC based multi-threaded server that can
+understand the protocol spoken by the PVFS mgr daemon, This is actually done
+by inserting a compatibility layer in the PVFS library and client daemon
+and the meta-data server before and after a request is sent/received by 
+the RPC layers of the metadata server. As before the meta-data server keeps 
+track of a set of content-addressable data servers over which data is striped 
+in the usual way that PVFS does (RAID-0 like).
+Once the IO servers are known to the client, there is another compatibility layer
+that translates the original I/O server requests and sends them out to our
+data servers (with the cypto hashes of course).
+
+Installation, usage etc is therefore identical to how you would use PVFS, (except that
+the tools, names, config files have a capfs prefix ofcourse!). Of course they differ in the way
+they operate under the hood. Those to wish to use this software are urged to read
+up the Quickstart, Detailed Installation User Guide of PVFS from
+http://www.parl.clemson.edu/pvfs.
+
+
+Each of the sub-directory's functionality is explained below,
+
+a) vfs - the linux 2.4.x kernel driver for CAPFS. One of the goals was to be able
+to use an un-modified PVFS kernel driver and intercept the upcalls in the client
+daemon. Consequently, this code is fairly identical to that.
+Some changes had to be made to this piece of code to accomplish our stated goals namely,
+invalidation of page cache to make memory mapped I/O sequentially consistent.
+
+b) tpool - A thread pool library built atop pthreads, that is used by the meta-data
+server and data-server for concurrency in handling multiple requests.
+
+c) test - Simple test programs that exercise different subsystems/components
+
+d) shared - Shared code that is used by most components, including things
+like socket I/O calls, RPC interface calls/wrappers, etc etc
+
+e) meta-server - This is the meta-data/hash/content server that is responsible
+for maintaining the mappings between blocks of files and their hashes.
+
+f) data-server - This is the data server that is "content-addressable" and stores/retrieves
+blocks based on their SHA-1 hashes. Fairly simple interface to talk to these servers.
+
+g) client - Implements the code for the user-space daemon that acts as the liason for
+the kernel driver and the meta/data servers. Upcalls are intercepted in this layer and
+transparently forwarded to the CAPFS daemons. Also includes the code for mounting
+the CAPFS file system
+
+h) cmgr - Implements a generic cache manager layer. For more details refer to cmgr/README.
+Also has code that implements a hcache (cache of hashes) and a dcache (a content-addressable
+client-side data cache)
+
+i) fsck - Originally written for the pvfs v1 file system consistency checker.
+Also doubles up as the distributed cleaner daemon for our file system.
+
+j) libcas - Code for the content-addressable layer of the system is abstracted here.
+
+k) lib - Modified header files of capfs
+
+NEW addition!
+
+l) vfs26 - the linux 2.6.x kernel driver for CAPFS!
